@@ -81,14 +81,17 @@ export async function executeTask({ organizationId, taskId, signal, runner = run
         await AgentRun.updateOne({ _id: run._id }, { status: 'FAILED', error: violations.join('; '), finishedAt: new Date() });
         return { slug, ok: false, summary: violations.join('; ') };
       }
-      await appendEvent({ organizationId, taskId, agentRunId: run._id, kind: 'agent_started', data: { slug, stage: stageIdx, tools } });
+      // CFO-allocated share wins; otherwise fall back to the agent's own limit,
+      // then the task-wide budget (legacy behaviour for tasks without a CFO split).
+      const maxBudgetUsd = task.agents.find((a) => a.slug === slug)?.maxCostUsd || version.limits?.maxCostUsd || task.budget?.maxCostUsd;
+      await appendEvent({ organizationId, taskId, agentRunId: run._id, kind: 'agent_started', data: { slug, stage: stageIdx, tools, maxBudgetUsd } });
       const handle = runner({
         prompt: brief(task, version, results),
         appendSystemPrompt: version.instructions,
         allowedTools: tools,
         permissionMode: 'default',
         maxTurns: version.limits?.maxTurns,
-        maxBudgetUsd: version.limits?.maxCostUsd || task.budget?.maxCostUsd,
+        maxBudgetUsd,
         // Continue the agent's own Claude session for per-agent chat threads so
         // follow-up messages keep context. Only meaningful for single-agent chat.
         resumeSessionId: task.kind === 'chat' ? task.resumeSessionId : undefined,

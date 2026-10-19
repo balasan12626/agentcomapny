@@ -12,6 +12,7 @@ import { decide } from '../../services/approvals.js';
 import { audit } from '../../services/audit.js';
 import { validateScope, canAdvanceFinding } from '../../core/bugBountyScope.js';
 import { planFromRequest, planToTask } from '../../core/ceoRouter.js';
+import { allocateBudget } from '../../core/cfoBudget.js';
 
 const objectId = z.string().refine((v) => mongoose.isValidObjectId(v), 'invalid id');
 const page = (req) => ({ limit: Math.min(Number(req.query.limit) || 50, 200), skip: Math.max(Number(req.query.skip) || 0, 0) });
@@ -177,9 +178,11 @@ export function apiRouter({ enqueue }) {
     idempotencyKey: z.string().min(8).max(128),
     mode: z.enum(['QUICK', 'STANDARD', 'DEEP', 'PARALLEL', 'SCHEDULED']).default('STANDARD'),
     execute: z.boolean().default(false),
+    budgetUsd: z.number().positive().max(10000).optional(),
   })), async (req, res) => {
     const project = await Project.findOne({ _id: req.valid.projectId, organizationId: req.organizationId });
     if (!project) return res.status(404).json({ error: 'project not found' });
+    const org = await Organization.findById(req.organizationId).lean();
     const scope = { $or: [{ organizationId: req.organizationId }, { organizationId: null }] };
     const [depts, agents] = await Promise.all([
       Department.find(scope).sort({ order: 1 }).lean(),
@@ -199,11 +202,21 @@ export function apiRouter({ enqueue }) {
     const taskShape = planToTask(plan);
     if (plan.coreRoles.length === 0) return res.status(422).json({ error: 'no capability matched; ask the user to clarify', plan });
 
-    if (!req.valid.execute) {
-      return res.json({ dryRun: true, plan, task: { instruction: req.valid.request, mode: req.valid.mode, ...taskShape } });
+    // CFO step: split the budget (explicit, else the org's per-task default)
+    // across the selected roles; each share becomes that agent's hard cap.
+    const totalUsd = req.valid.budgetUsd ?? org?.budgets?.maxCostUsdPerTask;
+    let cfo = null;
+    if (totalUsd) {
+      try { cfo = allocateBudget(plan.coreRoles, totalUsd); }
+      catch (err) { return res.status(422).json({ error: `CFO could not allocate: ${err.message}`, plan }); }
+      const share = new Map(cfo.allocations.map((a) => [a.slug, a.maxCostUsd]));
+      taskShape.agents = taskShape.agents.map((a) => ({ ...a, maxCostUsd: share.get(a.slug) }));
     }
-    const org = await Organization.findById(req.organizationId).lean();
-    const budget = { maxTokens: org?.budgets?.maxTokensPerTask, maxCostUsd: org?.budgets?.maxCostUsdPerTask };
+
+    if (!req.valid.execute) {
+      return res.json({ dryRun: true, plan, cfo, task: { instruction: req.valid.request, mode: req.valid.mode, ...taskShape } });
+    }
+    const budget = { maxTokens: org?.budgets?.maxTokensPerTask, maxCostUsd: totalUsd };
     const { task, created } = await createTask({
       organizationId: req.organizationId, projectId: req.valid.projectId, createdBy: req.user._id,
       idempotencyKey: req.valid.idempotencyKey, instruction: req.valid.request, mode: req.valid.mode,
@@ -212,7 +225,7 @@ export function apiRouter({ enqueue }) {
     });
     if (created) await enqueue({ organizationId: req.organizationId, taskId: task._id });
     await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'ceo.execute', target: String(task._id), requestId: req.id });
-    res.status(created ? 201 : 200).json({ dryRun: false, created, plan, task });
+    res.status(created ? 201 : 200).json({ dryRun: false, created, plan, cfo, task });
   });
 
   r.get(`${o}/skills`, requireOrg(P.read), async (req, res) => {

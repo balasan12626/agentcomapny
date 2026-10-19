@@ -140,7 +140,8 @@ const taskSchema = new Schema({
   instruction: { type: String, required: true, maxlength: 20000 },
   mode: { type: String, enum: ['QUICK', 'STANDARD', 'DEEP', 'PARALLEL', 'SCHEDULED'], default: 'STANDARD' },
   status: { type: String, enum: TASK_STATES, default: 'QUEUED', index: true },
-  agents: [{ slug: String, version: Number }],
+  // maxCostUsd = this agent's CFO-allocated share (hard per-run cap).
+  agents: [{ slug: String, version: Number, maxCostUsd: Number }],
   plan: { stages: [[String]], edges: [{ from: String, to: String, artifact: String }] },
   acceptanceCriteria: [{ id: String, description: String, status: { type: String, enum: ['PENDING', 'PASSED', 'FAILED'], default: 'PENDING' }, evidence: String }],
   pendingApprovalIds: [{ type: Id, ref: 'Approval' }],

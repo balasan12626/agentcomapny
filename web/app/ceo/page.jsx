@@ -51,6 +51,22 @@ function PlanView({ result }) {
         ))}
       </ol>
 
+      <h4 style={{ marginTop: 14, marginBottom: 6 }}>CFO budget allocation</h4>
+      {result.cfo ? (
+        <>
+          <table>
+            <thead><tr><th>Role</th><th>Department</th><th>Weight</th><th>Hard cap</th></tr></thead>
+            <tbody>
+              {result.cfo.allocations.map((a) => (
+                <tr key={a.slug}><td>{a.name}</td><td className="sub">{a.departmentSlug}</td><td>{a.weight}</td><td><strong>${a.maxCostUsd.toFixed(2)}</strong></td></tr>
+              ))}
+              <tr><td>Reserve (retries / validation)</td><td /><td /><td>${result.cfo.reserveUsd.toFixed(2)}</td></tr>
+            </tbody>
+          </table>
+          <p className="sub" style={{ marginTop: 4 }}>Total ${result.cfo.totalUsd.toFixed(2)} approved by the CFO. Each agent is stopped by Claude Code if it exceeds its cap.</p>
+        </>
+      ) : <p className="sub">No budget set — agents run without a per-agent cap. Enter a budget above to have the CFO split it.</p>}
+
       <h4 style={{ marginTop: 14, marginBottom: 6 }}>Acceptance criteria</h4>
       <ul style={{ margin: 0 }}>
         {(task?.acceptanceCriteria || []).map((c) => <li key={c.id} className="sub">{c.description}</li>)}
@@ -67,6 +83,7 @@ export default function Ceo() {
   const [request, setRequest] = useState('');
   const [projectId, setProjectId] = useState(search.get('projectId') || '');
   const [mode, setMode] = useState('STANDARD');
+  const [budgetUsd, setBudgetUsd] = useState('');
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null); // 'preview' | 'execute' | null
@@ -83,7 +100,7 @@ export default function Ceo() {
     try {
       const res = await api(`/orgs/${orgId}/ceo/execute`, {
         method: 'POST',
-        body: { request: request.trim(), projectId: pid, mode, execute, idempotencyKey: crypto.randomUUID() },
+        body: { request: request.trim(), projectId: pid, mode, execute, idempotencyKey: crypto.randomUUID(), ...(Number(budgetUsd) > 0 ? { budgetUsd: Number(budgetUsd) } : {}) },
       });
       if (execute && res.task?._id) { router.push(`/tasks/${res.task._id}`); return; }
       setPreview(res);
@@ -114,6 +131,9 @@ export default function Ceo() {
                 <select value={mode} onChange={(e) => setMode(e.target.value)}>
                   {['QUICK', 'STANDARD', 'DEEP', 'PARALLEL'].map((m) => <option key={m}>{m}</option>)}
                 </select>
+              </label>
+              <label style={{ flex: 1 }}>Budget (USD, CFO splits it)
+                <input type="number" min="0.5" step="0.5" value={budgetUsd} onChange={(e) => { setBudgetUsd(e.target.value); setPreview(null); }} placeholder="e.g. 10" />
               </label>
             </div>
             <label>Your request
