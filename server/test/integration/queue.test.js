@@ -32,6 +32,21 @@ test('duplicate enqueue of the same task yields one job', { skip: !hasRedis && '
   await taskQueue().obliterate({ force: true });
 });
 
+test('re-enqueueing a task whose old job already finished creates a new job (retry is never a silent no-op)', { skip: !hasRedis && 'redis-server not installed', timeout: 20000 }, async () => {
+  const { enqueueTask, taskQueue } = await import('../../src/queue/queue.js');
+  const { createWorker } = await import('../../src/queue/worker.js');
+  let runs = 0;
+  let done;
+  const worker = createWorker({ processor: async () => { runs += 1; done?.(); return 'ok'; } });
+  await new Promise((resolve) => { done = resolve; enqueueTask({ organizationId: 'o1', taskId: 't-retry' }); });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(await (await taskQueue().getJob('t-retry')).getState(), 'completed');
+  await new Promise((resolve) => { done = resolve; enqueueTask({ organizationId: 'o1', taskId: 't-retry' }); });
+  assert.equal(runs, 2);
+  await worker.close();
+  await taskQueue().obliterate({ force: true });
+});
+
 test('job held by a crashed (SIGKILLed) worker is recovered by another worker', { skip: !hasRedis && 'redis-server not installed', timeout: 20000 }, async () => {
   const { enqueueTask } = await import('../../src/queue/queue.js');
   const { createWorker } = await import('../../src/queue/worker.js');

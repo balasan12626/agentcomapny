@@ -9,7 +9,14 @@ export function taskQueue() {
 
 // jobId = taskId makes queue submission idempotent: re-submitting the same
 // task (duplicate HTTP delivery, recovery sweep) never enqueues it twice.
-export function enqueueTask({ organizationId, taskId, attempts = 2 }) {
+// A finished job with the same id would make BullMQ silently ignore the add
+// (a retried task would sit in QUEUED forever), so it is removed first.
+export async function enqueueTask({ organizationId, taskId, attempts = 2 }) {
+  const existing = await taskQueue().getJob(String(taskId));
+  if (existing) {
+    const state = await existing.getState();
+    if (state === 'completed' || state === 'failed') await existing.remove();
+  }
   return taskQueue().add('execute', { organizationId: String(organizationId), taskId: String(taskId) }, {
     jobId: String(taskId),
     attempts,

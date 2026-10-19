@@ -3,11 +3,13 @@
 // the subset our templates use. Anything else is rejected, not guessed.
 
 export function parseFrontmatter(text) {
-  if (typeof text !== 'string' || !text.startsWith('---\n')) return { error: 'missing frontmatter' };
-  const end = text.indexOf('\n---', 4);
+  if (typeof text !== 'string') return { error: 'missing frontmatter' };
+  const source = text.replace(/\r\n/g, '\n');
+  if (!source.startsWith('---\n')) return { error: 'missing frontmatter' };
+  const end = source.indexOf('\n---', 4);
   if (end === -1) return { error: 'unterminated frontmatter' };
   const data = {};
-  for (const raw of text.slice(4, end).split('\n')) {
+  for (const raw of source.slice(4, end).split('\n')) {
     const line = raw.trimEnd();
     if (!line.trim() || line.trim().startsWith('#')) continue;
     const m = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
@@ -17,7 +19,7 @@ export function parseFrontmatter(text) {
     else if (/^\[.*\]$/.test(v)) v = v.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
     data[m[1]] = v;
   }
-  return { data, body: text.slice(end + 4).replace(/^\n/, '') };
+  return { data, body: source.slice(end + 4).replace(/^\n/, '') };
 }
 
 export function toList(v) {

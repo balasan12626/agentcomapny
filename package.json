@@ -9,6 +9,8 @@
     "web"
   ],
   "scripts": {
+    "graph:update": "python -m graphify update .",
+    "graph:query": "python -m graphify query",
     "test": "npm test -w server && npm test -w connector",
     "test:integration": "npm run test:integration -w server",
     "lint": "npm run lint -w server",

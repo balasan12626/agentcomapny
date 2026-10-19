@@ -54,7 +54,7 @@ export function normalizeEvent(raw) {
     case 'user':
       return { kind: 'tool_result' };
     case 'result':
-      return { kind: 'result', subtype: raw.subtype, isError: !!raw.is_error, sessionId: raw.session_id, durationMs: raw.duration_ms, summary: String(raw.result || '').slice(0, 4000), usage: usageFromClaudeEvent(raw) };
+      return { kind: 'result', subtype: raw.subtype, isError: !!raw.is_error, sessionId: raw.session_id, durationMs: raw.duration_ms, summary: String(raw.result || '').slice(0, 16000), usage: usageFromClaudeEvent(raw) };
     default:
       return { kind: raw.type || 'unknown' };
   }

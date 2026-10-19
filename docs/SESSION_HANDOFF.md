@@ -47,10 +47,68 @@ Built the delivery chain. New routes `GET/POST /orgs/:id/clients` (clients with 
 
 **External-platform evaluation (earlier this session).** Cloned 5 repos read-only into git-ignored `tools/agent-platform-evaluation/`; verified SHA + license from actual files. Findings in `docs/AGENT_PLATFORM_EVALUATION.md`: ClauBoard & Agency are **AGPL-3.0** (don't merge into DATYLUNE source); agent-dashboard needs **tmux (native Windows unsupported)** → SOURCE_REVIEW_ONLY; `rea` (morluto/rea) is **"Reverse Engineer Anything"**, an off-domain binary-RE MCP, not an agent platform; only **Mission Control (MIT, same `@xyflow/react` stack)** is cleanly reusable and it overlaps features DATYLUNE already has. **Recommendation: build natively, borrow patterns not code; no external app installed/launched this session** (states recorded honestly). No upstream source modified.
 
+## Session 9 (2026-10-19) — Service routing and CRLF validation
+Updated CEO routing and management execution. E-commerce, marketing, Power BI analytics, and AI support route to their relevant teams. Ten department-head agents are now defined and seeded by `seed:org`; multi-role plans assign heads, then one project manager, then specialists, and persist those assignments on `Task.management`. Trivial single-role work receives its department head without a project manager. The CEO preview shows the assignments and the org catalog displays head-agent counts. `ceoRouter` + org-catalog tests pass 24/24. `npm run validate:claude` passes 20 skills and generated-agent sync after CRLF normalization; `npm run lint` passes 47 files; connector tests pass 3/3. Server suite: 47/48; the only failure is Windows symlink creation `EPERM` in the existing path-guard test. MongoDB-backed API/orchestrator integration passes 2/2; Redis queue tests skip because `redis-server` is not installed. The isolated test database was dropped after the run. Follow-up token usage: n/a.
+
+Remaining workflow gap: the newly dispatched heads and project manager receive the same project-level objective as the specialists and run in ordered stages, but there is not yet a dedicated head-authored brief, persisted per-role task breakdown, or separate department/CEO review gate. Do not claim those review phases are complete.
+
+Configured development MongoDB verified and seeded: 10 departments, 1 executive, 10 department heads, 50 core roles, 100 sub-agents (161 total); seeder wrote/bumped 61 published agent versions. The separate integration database was removed after tests.
+
+## Session 10 (2026-10-19) — Client/project-scoped workspace foundation
+Added a database-backed, searchable Clients group to the persistent sidebar and `/clients/:clientId` workspace with Overview, Projects and Tasks tabs. Added `/projects/:projectId` with Overview, Requirements, Task Board and Workflow tabs, and linked both clients and global projects into it. `GET /orgs/:orgId/clients/:clientId` and `GET /orgs/:orgId/projects/:projectId` restrict data through `Membership.projectIds`; an integration regression confirms a project-scoped user sees only one client/project/task, can open the authorized project, and is denied the other project/client. Requirement UI truthfully identifies structured requirement storage as not implemented. MongoDB API/orchestrator integration: 2 passed, 0 failed, 2 Redis queue tests skipped; isolated DB dropped. `/clients`, both dynamic workspace routes, `/icon.svg`, and `/favicon.ico` returned 200 from the running Next dev server. `npm run lint` (47 files), `npm run validate:claude` (20 skills, agents synchronized), and diagnostics pass.
+
+Not complete: external-client memberships/roles, client conversation/approval/artifact/report tabs, structured requirements, per-role task decomposition, head/CEO review gates, QA rework workflow, and worker device gateway/enrollment. Client workspace access currently follows organization membership plus optional projectIds; it is not a separate client-login boundary.
+
+## Session 11 (2026-10-19) — Operations home, sessions and project skills
+The Executive Dashboard now uses `GET /overview` for persisted client/project/task counts, scoped status counts, pending approvals, recent tasks and currently running AgentRuns. The Sessions page uses `GET /sessions` for persisted AgentRun summaries and redacted event excerpts, linking to the full task graph/timeline; it is not an interactive terminal. MongoDB status is shown without exposing the URI; local connector and MCP/MCPO are clearly marked NOT CONFIGURED. `/usage` is now filtered by accessible task IDs. Project managers can assign up to five approved, enabled client-default and project-specific skills; client defaults can only be changed when all the client's projects are in scope. Task creation snapshots exact versions/hashes and the orchestrator revalidates/injects approved content without increasing tool permissions. Client and project workspaces show skill assignment controls.
+Verification: MongoDB integration 2 passed, 0 failed, 2 Redis-dependent tests skipped; tests cover project-scope counts/runs/usage/session events, path redaction, approved skill assignment, draft rejection, task snapshot and prompt/tool behavior. Syntax gate (48 server files), Claude config validation (20 skills), browser route smoke checks and diagnostics pass. Actual connected Claude terminal/device and MCP/MCPO remain unavailable/unconfigured; production connections are not claimed.
+
+## Session 12 (2026-10-19) — Consolidated operating summary and Graphify check
+Updated root `CLAUDE.md` with dashboard/workspace ownership and explicit runtime boundaries: installed CLI or AgentRun is not a connected device; `/device` gateway and MCP/MCPO are not configured. Updated architecture and checklist evidence for project-scoped overview, usage, sessions, path redaction, and approved client/project skill snapshots. Dashboard shows client/project/task counts, actual RUNNING AgentRuns, persisted recent tasks, usage, MongoDB `CONNECTED`/`DISCONNECTED` without its URI, and honest connector/MCP status. Sessions page shows persisted AgentRun summaries and sanitized event excerpts, linking to the graph; it is not a shell. Light teal/ink theme applied; dashboard/session data refreshes from the API every 10 seconds.
+Graphify verification: no `graphify`/`graphifyy` executable, no installed `graphifyy` Python package, and no `graphify-out/graph.json` found. Refresh was NOT run. Per `.claude/skills/graphify-repository-analysis/SKILL.md`, install needs user approval; no install attempted. The `.graphifyignore` is present and excludes secrets/build artifacts.
+Final checks: MongoDB integration 2 passed, 0 failed, 2 Redis queue tests skipped; connector tests 3/3; `npm run lint` passes (48 server files); `npm run validate:claude` passes (20 skills); `git diff --check` clean; dashboard/sessions/integrations/client/project/icon routes and `/api/v1/health` return 200. Full server unit tests 47/48; only the existing Windows path-guard symlink creation fails with `EPERM`. Production build not run while the dev server owns `.next`. Token usage: n/a.
+
+## Session 13 (2026-10-19) — Audit remediation (DATYLUNE_AI_OS_Audit, score 5.2)
+Implemented the audit's top-20 list (checklist rows I-01..I-11, plus B-02/E-07/F-04/G-03 updated). Root causes found in code and DB, not just symptoms:
+- **Stuck QUEUED task** = the worker process had died (dev.mjs never restarted it) and nothing reported it. Also, `enqueueTask` silently ignored re-adds when a finished job with the same id existed, and any orchestrator exception stranded tasks in PLANNING. Fixed with a worker heartbeat (`WorkerHeartbeat`), an API-side stall sweeper (`services/stalls.js`, new `STALLED` state), Retry, `processTask` error handling, job replacement in `enqueueTask`, and dev.mjs auto-restart.
+- **Run COMPLETED / task CANCELLED**: in the audited case the run really finished; the task was cancelled later. The real race was that cancel never reached the worker. Cancel now closes runs and approvals (`cancelTask`), the worker polls status and aborts, and Sessions shows a `statusNote`.
+- **"Execute creates a project"**: not a product bug. Those `project.create` rows came from scripted sandbox runs (different request ids). An integration test now asserts that execute never creates a project.
+- Workspace isolation (`core/workspaceIsolation.js`, `services/workspaces.js`): unique roots, no overlap across orgs, DATYLUNE app tree protected, re-checked at execution. Client required for projects. Preflight (`GET /projects/:id/preflight`) blocks tasks, CEO execute, chat and retry. Task-specific acceptance criteria are evaluated from recorded runs (`evaluateCriteria`). Canonical agents only (`?include=legacy`). Agent detail API. Audit filters and names. Path redaction. Scope route validated with zod.
+- Web: SWR cache, user menu/logout/session expiry, nav regroup with "Coming soon", per-page titles, tabs, ellipsis, Kanban, Markdown reports, agent picker, preflight panel, branded 404, CSP/HSTS/Permissions-Policy, skills errors, scope form. Also fixed a pre-existing bug where the task timeline never showed events (impure setState updater).
+- Data: `npm run hygiene -w server -- --apply` ran on the dev DB. 3 orphan projects → client "Internal", 5 "Sandbox Live Run" projects archived (client "Sandbox (test runs)"), and "Marketplace Web App" moved to its own folder. Backup: `.data-backups/data-hygiene-2026-10-19T16-15-01-573Z.json`. Each change is audited (actor system:data-hygiene).
+Checks: server unit 56/57 (only the known Windows symlink EPERM); MongoDB integration 4/4 on throwaway DB `datylune_itest_audit` (dropped); queue integration 3/3 with portable redis-server on PATH; lint ok; `next build` 25 routes ok (`NEXT_DIST_DIR=.next-build`); browser smoke of 12 routes, no console errors. Token usage: n/a.
+Worker is **not running** now (not started this session to avoid spending quota on the queued chat task "CREAT POTFLIO", now STALLED).
+
+## Session 14 (2026-10-19) — IT-company workflow: Phase 0 blockers
+- Root cause of "runs completed but worker never seen": one execution path only (worker → executeTask). The runs (last 12:17) came from a worker build that predates heartbeats and has since stopped; 0 heartbeat rows. Monitoring now shows the last run and says so.
+- Dispatch with no worker online is refused (409 WORKER_OFFLINE) on CEO execute, Tasks, Agent Chat and Retry; a human can tick "Queue anyway" (queueAnyway:true, audited). Workspace failures are never overridable.
+- One response-wide redaction gate in routes/index.js (core/redact.js redactResponse): roots → <workspace>, other absolute paths → <path>/name, home folders → ~. Workspace managers keep full roots only under workspace.allowedRoots.
+- Auth was already an httpOnly SameSite=Strict cookie with no token in localStorage or the user object; added sliding renewal and GET /auth/session (no 401 when signed out).
+- Checks: unit 59/60 (known symlink EPERM), integration 7/7, lint 55 files, validate:claude ok, next build 25 routes. Browser check not done (Chrome unresponsive).
+- Checklist rows J-01..J-05.
+
+## Session 15 (2026-10-19) — Workflow Phases 1 + 2 complete
+- Phase 1: 7 workflow models in models/index.js (org + client scoped, history[]), Task.workItemId/legacy, migration workflow-v1 (`npm run migrate:workflow -w server`, dry run default, backup first, `--revert <file>`). Applied on dev DB: 6 tasks marked legacy, backup `.data-backups/migrate-workflow-2026-10-19T17-18-26-649Z.json`.
+- Phase 2: core/workflow.js (pure rules for request/plan/workItem/deliverable) + services/workflow.js (`move()` is the only status writer; history + audit). CEO decisions, budget raises and final delivery approval are human ORG_ADMIN/PLATFORM_OWNER only; agents (incl. founder-ceo) never.
+- Checks: unit 74/75 (known symlink EPERM only; workflow 15/15), integration 16/16 (workflow 9/9), lint 61 files, validate:claude ok.
+- Checklist rows J-06..J-09; docs/PHASES.md Phases 1–2 marked DONE.
+
+## Session 16 (2026-10-19) — Workflow Phase 3 complete (agents, prompts, schemas)
+- business-analyst added to catalog/organization.mjs `workflowRoles` (Product, read-only) and seeded (dev DB: v1).
+- core/workflowSteps.js (step → agent → workflow role, spend caps, prompt builders with fenced untrusted text, JSON contract, rework notes) and core/agentOutputs.js (zod schema per step, extractJson).
+- services/workflowAgents.js: scheduleStep (worker online + project workspace + agent role required; idempotent), worker hooks before/afterWorkflowTask (validate → apply via services/workflow.js; one retry with errors; then BLOCKED or escalation), output files must exist in the workspace, advance() driver. Task.kind `workflow` + Task.workflow; ClientRequest.ceoBrief; adapter result kept up to 16k chars.
+- Checks: unit 82/83 (known symlink EPERM only; agentOutputs 8/8), integration 19/19 (workflowAgents 3/3), lint 66 files, validate:claude ok.
+- Checklist rows J-10..J-12; docs/PHASES.md Phase 3 marked DONE.
+
+## Session 17 (2026-10-19) — Graphify installed, dark theme, ready for Phases 4–7
+- Graphify: `python -m pip install --user graphifyy==0.9.92`; `graphify install --project --platform claude` (upstream skill `.claude/skills/graphify/`, PreToolUse hooks run `python -m graphify hook-guard …`; installer's `.claude/CLAUDE.md` removed). Graph built locally: 1224 nodes / 2622 edges / 84 communities; no secrets, no absolute paths. `npm run graph:update` / `npm run graph:query -- "<q>"`. validate:claude treats `graphify` as a pinned third-party skill. Checklist D-01/D-02 VERIFIED.
+- Dark theme: globals.css light + dark token sets (`prefers-color-scheme` unless `data-theme=light`; `data-theme=dark` forces), `--on-accent` for button text, ThemeSwitch (System/Light/Dark, localStorage `dl_theme`, pre-paint boot script in layout). Row J-13.
+- docs/PHASES.md has a "Start here next session" table with files and done-when for Phases 4, 5, 6, 7 and Part B.
+- Browser automation was unresponsive again (timeouts); dark mode verified with one JS probe on the live dev server.
+
 ## Blockers
-- Graphify: package install denied in the cloud session → D-01/D-02 BLOCKED. Install locally per docs/GRAPHIFY_INTEGRATION.md.
-- MongoDB: no binary/daemon reachable → DB-backed integration tests skipped. Run with `MONGODB_TEST_URI=mongodb://localhost:27017/dltest?replicaSet=rs0`.
-- No real `claude -p` task has been executed through the orchestrator yet.
+- Graphify: CLI/package absent locally and no graph generated; D-01/D-02 remain BLOCKED. Install only with approval per docs/GRAPHIFY_INTEGRATION.md.
+- MongoDB: local instances are reachable on ports 27017 and 27018; API/orchestrator integration passed using an isolated database, which was dropped after testing. Redis is not installed, so queue integration tests skip.
 
 ## Decisions
 - MetaGPT used as concepts only (watches/produces planning); no Python runtime.
@@ -60,8 +118,11 @@ Built the delivery chain. New routes `GET/POST /orgs/:id/clients` (clients with 
 - No `.claude/CLAUDE.md` duplicate: root CLAUDE.md only (both would load every session, wasting tokens).
 
 ## Next (in order)
-0. Run locally per README §2–3 and confirm login + task submission on desktop and phone.
-1. Install Graphify, build graph, run D-02 checks.
-2. Run integration suite against MongoDB; fix findings.
-3. Device enrollment + server `/device` gateway (B-05); route tasks to connectors.
-4. Validators as acceptance checks (E-02); agent-version write API (C-04).
+00. START HERE: `npm run dev` (worker must show ONLINE), then follow docs/PHASES.md "Start here next session": Phase 4 API → 5 UI (light + dark, 1440/375 px) → 6 clean-up (dry run reviewed with the user) → 7 Playwright/axe/security. Client Agent demo after 1–5; ask its Step-0 questions one at a time before building it.
+0. Restart `npm run dev` (the worker restarts automatically now). Then Retry or Cancel the STALLED "CREAT POTFLIO" chat task, and give "BALA", "Balakarthikeyan" and "Demo Marketplace" their own workspace folders (Projects → Edit), or set `WORKSPACE_BASE`.
+0b. Remaining audit items: axe + Lighthouse on the production build, mobile screenshots at 390/768 px, per-run OS/container sandbox (ports are still shared between runs), validators as AUTOMATED criteria (E-02), QA/rework loop, deliverables list.
+1. Install Graphify with approval, build graph, run D-02 checks.
+2. Build the authenticated device gateway/enrollment and verify direct worker connectivity; obtain the MCP/MCPO endpoint, transport, auth method and tool scope before implementing transport. Never paste credentials in chat.
+3. Add client memberships/roles and client-scoped conversations, approvals, deliverables and reports.
+4. Add head-authored briefs, persisted per-role tasks, department/CEO review gates, and QA rework.
+5. Install/configure Redis for queue integration; complete validators as acceptance checks (E-02) and agent-version write API (C-04).

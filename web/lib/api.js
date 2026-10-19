@@ -12,6 +12,14 @@ export async function api(path, { method = 'GET', body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => null);
+  // An expired or revoked session anywhere sends the user back to sign-in.
+  if (res.status === 401 && !path.startsWith('/auth/') && typeof window !== 'undefined') window.dispatchEvent(new Event('dl:unauthenticated'));
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
+}
+
+// Human-readable message for an API error (validation issues, pre-flight).
+export function errorText(err) {
+  if (err?.body?.issues?.length) return err.body.issues.map((i) => `${i.path || 'request'}: ${i.message}`).join('; ');
+  return err?.body?.error || err?.message || 'Request failed';
 }

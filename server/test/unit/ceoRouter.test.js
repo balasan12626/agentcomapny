@@ -51,6 +51,43 @@ test('paid campaign analysis routes to marketing', () => {
   assert.ok(plan.departments.includes('marketing-growth'));
 });
 
+test('e-commerce build routes to engineering specialists', () => {
+  const plan = planFromRequest('Build an e-commerce marketplace with product listings, search, product details, cart, checkout, admin dashboard, authentication, order management, responsive UI, automated tests, and security review.', catalog);
+  const roles = plan.coreRoles.map((r) => r.slug);
+  assert.ok(plan.departments.includes('software-engineering'));
+  for (const role of ['frontend-engineer', 'backend-engineer', 'database-engineer', 'qa-engineer', 'application-security-engineer']) {
+    assert.ok(roles.includes(role), `${role} should be selected`);
+  }
+});
+
+test('marketing technology request stays with marketing', () => {
+  const plan = planFromRequest('Improve local business visibility with SEO, Google Ads, Meta Ads, GA4 and conversion tracking.', catalog);
+  const roles = plan.coreRoles.map((r) => r.slug);
+  assert.deepEqual(plan.departments, ['marketing-growth']);
+  assert.ok(roles.includes('seo-specialist'));
+  assert.ok(roles.includes('paid-advertising-specialist'));
+  assert.ok(roles.includes('marketing-analytics-specialist'));
+});
+
+test('Power BI sales dashboard routes to data and analytics, not sales', () => {
+  const plan = planFromRequest('Create a Power BI dashboard analyzing revenue, customer acquisition, product performance, regional sales, and monthly growth.', catalog);
+  const roles = plan.coreRoles.map((r) => r.slug);
+  assert.ok(plan.departments.includes('data-ai'));
+  assert.ok(roles.includes('bi-engineer'));
+  assert.ok(roles.includes('data-analyst'));
+  assert.ok(!plan.departments.includes('sales-revops'));
+  assert.ok(plan.departmentHeads.some((h) => h.slug === 'cdao'));
+  assert.ok(!plan.departmentHeads.some((h) => ['cto', 'vp-eng-ops'].includes(h.slug)));
+  assert.equal(plan.projectManager.slug, 'project-manager');
+});
+
+test('AI support assistant routes to AI engineering', () => {
+  const plan = planFromRequest('Build an AI support assistant that answers questions from company documentation and escalates uncertain questions to human support.', catalog);
+  assert.ok(plan.departments.includes('data-ai'));
+  assert.ok(plan.coreRoles.some((r) => r.slug === 'ai-rag-engineer'));
+  assert.ok(!plan.departments.includes('sales-revops'));
+});
+
 test('a pure question needs no specialists', () => {
   const plan = planFromRequest('What is our current deployment process?', catalog);
   // "deployment"/"process" may match ops roles; accept either a question or a small team, but never a huge fan-out
@@ -76,22 +113,39 @@ test('dependencies order design/product before build before test', () => {
 test('planToTask builds dependency-layered stages the orchestrator can run', () => {
   const plan = planFromRequest('Design and build a login API with a frontend form and automated tests', catalog);
   const t = planToTask(plan);
-  // agents match the plan's roles
-  assert.deepEqual(t.agents.map((a) => a.slug).sort(), plan.coreRoles.map((r) => r.slug).sort());
-  // stages are arrays of role slugs; every role appears exactly once
+  // specialist and management identities are all dispatched
+  const expectedAgents = [...plan.coreRoles.map((r) => r.slug), ...plan.departmentHeads.map((h) => h.slug), plan.projectManager.slug].sort();
+  assert.deepEqual(t.agents.map((a) => a.slug).sort(), expectedAgents);
+  assert.deepEqual(t.managementAgents.map((a) => a.slug).sort(), [...plan.departmentHeads.map((h) => h.slug), plan.projectManager.slug].sort());
+  assert.deepEqual(t.management.departmentHeads.map((h) => h.slug).sort(), plan.departmentHeads.map((h) => h.slug).sort());
+  assert.equal(t.management.projectManager.slug, plan.projectManager.slug);
+  // stages are arrays of role slugs; every assigned identity appears once
   const flat = t.plan.stages.flat();
   assert.equal(new Set(flat).size, flat.length, 'no role appears in two stages');
-  assert.deepEqual(flat.sort(), plan.coreRoles.map((r) => r.slug).sort());
+  assert.deepEqual(flat.sort(), expectedAgents);
+  assert.ok(t.plan.stages[0].every((slug) => plan.departmentHeads.some((h) => h.slug === slug)), 'department heads lead the workflow');
+  assert.ok(t.plan.stages[1].includes(plan.projectManager.slug), 'project manager follows department heads');
   // a dependency from A->B must place A in an earlier stage than B
   const stageOf = (slug) => t.plan.stages.findIndex((s) => s.includes(slug));
   for (const e of t.plan.edges) assert.ok(stageOf(e.from) < stageOf(e.to), `${e.from} must precede ${e.to}`);
   assert.ok(t.acceptanceCriteria.every((c) => c.id && c.description));
 });
 
-test('planToTask of a single-role plan is one stage, no edges', () => {
+test('single-role plan is owned by its department head without a project manager', () => {
   const t = planToTask(planFromRequest('Improve our SEO keyword rankings', catalog));
-  assert.deepEqual(t.plan.stages, [['seo-specialist']]);
-  assert.equal(t.plan.edges.length, 0);
+  assert.deepEqual(t.plan.stages, [['cmo'], ['seo-specialist']]);
+  assert.deepEqual(t.plan.edges.map((e) => [e.from, e.to]), [['cmo', 'seo-specialist']]);
+  assert.equal(t.managementAgents.some((a) => a.slug === 'project-manager'), false);
+});
+
+test('a selected project-manager role is not duplicated or made cyclic', () => {
+  const plan = planFromRequest('Plan an SEO campaign with milestones and dependencies', catalog);
+  const t = planToTask(plan);
+  assert.equal(t.agents.filter((a) => a.slug === 'project-manager').length, 1);
+  assert.equal(t.managementAgents.filter((a) => a.slug === 'project-manager').length, 0);
+  assert.ok(!t.plan.edges.some((e) => e.from === e.to));
+  const stageOf = (slug) => t.plan.stages.findIndex((stage) => stage.includes(slug));
+  for (const edge of t.plan.edges) assert.ok(stageOf(edge.from) < stageOf(edge.to));
 });
 
 test('plan always carries acceptance criteria and a coordinator', () => {

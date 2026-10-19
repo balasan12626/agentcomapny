@@ -6,11 +6,11 @@
 | Package | `graphifyy` **0.9.92** on PyPI (double "y" — other `graphify*` packages are unaffiliated); CLI is `graphify` |
 | License | Apache-2.0 (+ LICENSE-MIT, NOTICE) — usable as a tool; nothing vendored into this repo |
 | Runtime | Python ≥ 3.10 (container has 3.13); tree-sitter grammars incl. JavaScript |
-| Status | **BLOCKED in the cloud session**: installing the package was denied by the session's permission policy. Not installed, no graph generated yet. |
+| Status | **INSTALLED (Session 17, 2026-10-19, local Windows dev machine)**: `python -m pip install --user graphifyy==0.9.92` → `graphify 0.9.92`; `graphify install --project --platform claude` (upstream skill in `.claude/skills/graphify/`, PreToolUse hooks in `.claude/settings.json` run as `python -m graphify hook-guard …` because the user Scripts dir is not on PATH; the installer's `.claude/CLAUDE.md` was removed — root CLAUDE.md only). First build `graphify update .` (AST-only, local, no LLM): **1224 nodes, 2622 edges, 84 communities**; acceptance: `query "what calls runClaude?"` → `server/src/adapters/claudeCode.js`; `grep -c SESSION_SECRET= graph.json` → 0; no absolute paths or user name in graphify-out. |
 
 ## Install (run on a dev machine, once)
 ```bash
-uv tool install graphifyy==0.9.92      # or: pipx install graphifyy==0.9.92
+uv tool install graphifyy==0.9.92      # or: pipx install graphifyy==0.9.92 / python -m pip install --user graphifyy==0.9.92
 graphify install --project             # writes .claude/skills/graphify/SKILL.md (+ references/) — commit it
 graphify --version                     # verify
 ```

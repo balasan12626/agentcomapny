@@ -9,21 +9,21 @@ function RoleCard({ role }) {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-        <strong>{role.name}</strong>
+        <Link href={`/agents/${role.slug}`}><strong>{role.name}</strong></Link>
         <span className="sub" style={{ whiteSpace: 'nowrap' }}>{role.type}</span>
       </div>
       <div className="sub">{role.slug} · v{role.publishedVersion || '—'} · {role.enabled ? 'enabled' : 'disabled'}</div>
       <div className="row" style={{ gap: 8 }}>
-        <button onClick={() => setOpen((v) => !v)} style={{ fontSize: 12 }}>
+        <button type="button" className="chip" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
           {open ? '▾' : '▸'} {role.subAgentCount} sub-agents
         </button>
-        <Link href={`/agents/${role.slug}/chat`} className="btn secondary" style={{ fontSize: 12, padding: '4px 10px' }}>💬 Chat</Link>
+        <Link href={`/agents/${role.slug}/chat`} className="btn secondary small">Chat</Link>
       </div>
       {open && (
         <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
           {role.subAgents.map((s) => (
             <li key={s._id} style={{ marginBottom: 2 }}>
-              <Link href={`/agents/${s.slug}/chat`}>{s.name}</Link> <span className="sub">· {s.slug}</span>
+              <Link href={`/agents/${s.slug}`}>{s.name}</Link> <span className="sub">· <Link href={`/agents/${s.slug}/chat`}>chat</Link></span>
             </li>
           ))}
         </ul>
@@ -44,18 +44,18 @@ export default function Catalog() {
 
   return (
     <>
-      <h1>Company Org Catalog</h1>
+      <h1>Org Chart</h1>
       <p className="sub">
-        Founder/CEO → 10 departments → 50 core roles → 100 specialist sub-agents. Configurable governed
-        workflow identities executed through Claude Code — not separate models, and not permission grants.
+        The single company catalogue: Founder/CEO → department heads → departments → core roles → specialist sub-agents (live counts below).
+        Governed workflow identities executed through Claude Code — not separate models, and not permission grants.
       </p>
 
       <Data q={q} empty="Catalog not seeded. Run `npm run seed:org -w server`.">
         {(data) => (
           <>
             {data.executive && (
-              <section className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--accent, #7c5cff)' }}>
-                <h3 style={{ margin: 0 }}>👑 {data.executive.name}</h3>
+              <section className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--accent)' }}>
+                <h3 style={{ margin: 0 }}><Link href={`/agents/${data.executive.slug}`}>{data.executive.name}</Link></h3>
                 <div className="sub">{data.executive.slug} · coordinates {data.counts.departments} department heads</div>
                 <p className="sub" style={{ margin: '6px 0 0' }}>{data.executive.mission || 'Company-wide coordination and prioritization.'}</p>
               </section>
@@ -63,15 +63,15 @@ export default function Catalog() {
 
             <div style={{ display: 'flex', gap: 24, marginBottom: 12, flexWrap: 'wrap' }}>
               <span className="sub"><strong>{data.counts.departments}</strong> departments</span>
+              <span className="sub"><strong>{data.counts.departmentHeads}</strong> department heads</span>
               <span className="sub"><strong>{data.counts.coreRoles}</strong> core roles</span>
               <span className="sub"><strong>{data.counts.subAgents}</strong> sub-agents</span>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-              <button onClick={() => setActive(null)} aria-current={!active} style={{ fontSize: 12, fontWeight: active ? 400 : 700 }}>All</button>
+            <div className="chips" role="group" aria-label="Filter by department" style={{ marginBottom: 18 }}>
+              <button type="button" className="chip" onClick={() => setActive(null)} aria-pressed={!active}>All</button>
               {departments.map((d) => (
-                <button key={d.slug} onClick={() => setActive(d.slug)} aria-current={active === d.slug}
-                  style={{ fontSize: 12, fontWeight: active === d.slug ? 700 : 400 }}>{d.name}</button>
+                <button type="button" className="chip" key={d.slug} onClick={() => setActive(d.slug)} aria-pressed={active === d.slug}>{d.name}</button>
               ))}
             </div>
 

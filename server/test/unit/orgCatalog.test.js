@@ -1,14 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { departments, coreRoles, subAgents, executive, counts, allAgents, KNOWN_SKILLS, TOOLSETS } from '../../../catalog/organization.mjs';
+import { departments, departmentHeads, coreRoles, subAgents, executive, counts, allAgents, KNOWN_SKILLS, TOOLSETS } from '../../../catalog/organization.mjs';
 
 const slugRe = /^[a-z0-9-]{2,64}$/;
 
 test('exactly 10 departments, 50 core roles, 100 sub-agents', () => {
   assert.equal(departments.length, 10);
+  assert.equal(departmentHeads.length, 10);
   assert.equal(coreRoles.length, 50);
   assert.equal(subAgents.length, 100);
-  assert.deepEqual(counts, { departments: 10, coreRoles: 50, subAgents: 100, total: 151 });
+  assert.deepEqual(counts, { departments: 10, departmentHeads: 10, coreRoles: 50, subAgents: 100, total: 161, workflowRoles: 1 });
 });
 
 test('every core role has exactly two sub-agents', () => {
@@ -74,11 +75,15 @@ test('every role carries responsibilities, acceptance criteria and escalation', 
   }
 });
 
-test('allAgents() flattens to 151 entries with department names', () => {
+test('allAgents() flattens to 161 catalogue entries + 1 workflow role (business-analyst)', () => {
   const flat = allAgents();
-  assert.equal(flat.length, 151);
+  assert.equal(flat.length, 162);
+  const ba = flat.find((a) => a.slug === 'business-analyst');
+  assert.equal(ba.departmentSlug, 'product-delivery');
+  assert.equal(ba.tools, 'readonly');
   assert.ok(flat.every((a) => typeof a.department === 'string' && a.department.length));
   assert.equal(flat.filter((a) => a.kind === 'EXECUTIVE').length, 1);
-  assert.equal(flat.filter((a) => a.kind === 'CORE_ROLE').length, 50);
+  assert.equal(flat.filter((a) => a.kind === 'DEPARTMENT_HEAD').length, 10);
+  assert.equal(flat.filter((a) => a.kind === 'CORE_ROLE').length, 51);
   assert.equal(flat.filter((a) => a.kind === 'SUBAGENT').length, 100);
 });

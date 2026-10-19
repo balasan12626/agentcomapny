@@ -48,7 +48,8 @@ for (const a of catalog.agents) {
   const file = path.join(outDir, `${a.slug}.md`);
   const content = render(a, tools);
   if (check) {
-    if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== content) errors.push(`${a.slug}.md is out of date (run npm run generate:agents)`);
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : null;
+    if (existing !== content) errors.push(`${a.slug}.md is out of date (run npm run generate:agents)`);
   } else {
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(file, content);

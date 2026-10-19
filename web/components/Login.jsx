@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { ThemeSwitch } from './ThemeSwitch';
 
 export function Login() {
   const [error, setError] = useState(null);
@@ -21,6 +22,7 @@ export function Login() {
         {error && <p role="alert" className="s-err">{error}</p>}
         <button className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
+      <ThemeSwitch />
     </main>
   );
 }

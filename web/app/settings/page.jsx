@@ -1,4 +1,4 @@
 import { Pending } from '@/components/Pending';
 export default function Settings() {
-  return <Pending title="Settings" checklistId="B-06">Organization budgets (tokens/cost per task, concurrency) are stored on the Organization record; an editing UI is not built.</Pending>;
+  return <Pending title="Settings" workaround="per-task budgets can be set when you brief the CEO; organization defaults are set by your platform administrator.">Organization defaults such as token and cost budgets per task and the number of tasks that may run at once.</Pending>;
 }

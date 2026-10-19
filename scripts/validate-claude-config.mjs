@@ -10,6 +10,10 @@ import { validateSkillMarkdown } from '../server/src/core/skillValidator.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
 const skillsDir = path.join(root, '.claude/skills');
+// Pinned upstream skills installed by their own tool (not edited here): they
+// must parse and match their folder, but our house style (Acceptance section,
+// ≤120 lines) does not apply. Our wrapper skill carries the house rules.
+const THIRD_PARTY = { graphify: 'graphifyy==0.9.92 (`graphify install --project`); wrapped by graphify-repository-analysis' };
 let count = 0;
 for (const dir of fs.readdirSync(skillsDir)) {
   const f = path.join(skillsDir, dir, 'SKILL.md');
@@ -17,6 +21,11 @@ for (const dir of fs.readdirSync(skillsDir)) {
   const text = fs.readFileSync(f, 'utf8');
   const v = validateSkillMarkdown(text);
   count++;
+  if (THIRD_PARTY[dir]) {
+    const name = /^---[\s\S]*?\nname:\s*["']?([^\n"']+)/.exec(text)?.[1]?.trim();
+    if (name !== dir) errors.push(`${dir}: third-party skill frontmatter name "${name}" must match folder`);
+    continue;
+  }
   if (!v.valid) errors.push(`${dir}: ${v.errors.join('; ')}`);
   if (v.meta?.name !== dir) errors.push(`${dir}: frontmatter name "${v.meta?.name}" must match folder`);
   if (v.warnings.length) errors.push(`${dir}: ${v.warnings.join('; ')}`);

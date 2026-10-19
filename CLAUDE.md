@@ -15,13 +15,14 @@ This file is loaded every session: keep it short, true and in sync with the code
 ## Repo map
 | Path | What |
 |---|---|
-| `server/src/core/` | Pure logic: state machine, approvals, permissions, pathGuard, redact, usage, toolPolicy, skillValidator, roleGraph, bugBountyScope, checklist |
-| `server/src/services/` | tasks (idempotent create, transitions, usage), events (seq + replay), approvals, orchestrator, audit |
+| `server/src/core/` | Pure logic: task state machine (incl. STALLED), delivery workflow rules (`workflow.js`), workflow agent steps/prompts (`workflowSteps.js`) and output schemas (`agentOutputs.js`), approvals, permissions, pathGuard, workspaceIsolation, staleness, redact (+paths), usage, toolPolicy, skillValidator, roleGraph, bugBountyScope, checklist |
+| `server/src/services/` | workflow (`move()` = only workflow status writer; request→delivery operations), workflowAgents (agent steps as queued Tasks, validate → apply, `advance()`), migrations, tasks (create, transitions, cancel/retry), events, approvals, orchestrator (criteria evaluation), workspaces (isolation, preflight), stalls (sweeper, heartbeat), projectSkills, audit |
 | `server/src/http/` | app, middleware (auth, CSRF, requireOrg), `routes/index.js` (all REST under `/api/v1`) |
 | `server/src/ws/gateway.js` | Authenticated task subscriptions with missed-event replay |
 | `catalog/agents.json` | Source of truth for agents → `npm run generate:agents` → `.claude/agents/*.md` |
 | `.claude/skills/*/SKILL.md` | Project skills (validated by `npm run validate:claude`) |
-| `docs/` | AUDIT, CHECKLIST, HANDOFF, ARCHITECTURE, GRAPHIFY, METAGPT, SETUP |
+| `docs/` | PHASES (workflow roadmap + status), AUDIT, CHECKLIST, HANDOFF, ARCHITECTURE, GRAPHIFY, METAGPT, SETUP |
+| `web/app/` | Dashboard, searchable client/project workspaces, persisted task graphs, sessions and integration status |
 
 ## Every task: start here (cheap → expensive)
 1. Read `docs/SESSION_HANDOFF.md` and the relevant rows of `docs/IMPLEMENTATION_CHECKLIST.md`.
@@ -32,6 +33,9 @@ This file is loaded every session: keep it short, true and in sync with the code
 ## Mandatory rules
 - Inspect before editing; small scoped diffs; preserve working code and user data.
 - Every query is tenant-scoped (`organizationId`, plus project scope). Authorization is server-side only.
+- Every project has a client and its own workspace root; roots may never equal/contain/sit inside another project's or the app tree (`assertIsolatedRoots`). Dispatch goes through `preflight`.
+- Project skill assignments are approved, version/hash-pinned, revalidated at execution, and cannot expand agent tools.
+- Dashboard counts, usage, session runs and events must be filtered through the caller's accessible task/project IDs.
 - Long work runs in the queue, never inside an HTTP request.
 - A task is COMPLETED only when all acceptance criteria are PASSED and no approval is pending (`completionBlockers`).
 - Restricted operations (`core/restrictedOps.js`) need a human approver who is not the requester. Role titles (Founder/CEO/CISO) grant nothing.
@@ -41,6 +45,12 @@ This file is loaded every session: keep it short, true and in sync with the code
 - Never expose secrets; never bypass permissions, approvals or hooks; never push/force-push without approval.
 - Bug-bounty / security testing only with a valid scope record (`core/bugBountyScope.js`); otherwise passive review.
 - Never claim a test, build, integration or deployment succeeded without output that shows it.
+
+## Runtime boundaries
+- Installing Claude Code or seeing an `AgentRun` does not prove a persistent terminal/device connection. Only a verified registered-device handshake can be reported as connected.
+- Worker liveness = `WorkerHeartbeat` rows; the API's stall sweeper marks un-progressed tasks STALLED. Report worker status only from heartbeats.
+- The connector client exists, but the server `/device` gateway/enrollment lifecycle is not implemented. The dashboard must report this as not configured.
+- MCP/MCPO transport and credentials are not configured. Never present an integration as connected without an authorized handshake.
 
 ## Token efficiency
 - Graph query > targeted grep > partial read > full read. Never read whole large files or dump trees/lockfiles/logs.
@@ -70,3 +80,9 @@ npm run generate:agents         # regenerate .claude/agents from catalog
 ## Completion record (end of every meaningful task)
 1 What changed · 2 Files · 3 Checks run · 4 Evidence (counts/output) · 5 Security implications · 6 Remaining issues · 7 Checklist rows updated (incl. Tokens) · 8 Next task.
 Then update `docs/IMPLEMENTATION_CHECKLIST.md` rows in place (never renumber or delete) and rewrite `docs/SESSION_HANDOFF.md` "Current state" + "Next".
+
+## graphify
+Installed: `graphifyy==0.9.92` (pip --user; run as `python -m graphify …` when `graphify` is not on PATH). Graph: `graphify-out/graph.json` (AST-only, local tree-sitter, no LLM, relative paths). Project hooks in `.claude/settings.json` nudge a graph query before raw search/read.
+- Codebase question → `graphify query "<question>"` / `path "A" "B"` / `explain "X"` first; read raw files only for lines the graph located. Put this rule in subagent briefs that explore code.
+- `GRAPH_REPORT.md` only for broad architecture review.
+- After code changes: `npm run graph:update` (incremental). A committed graph.json is rewritten whole each build; a large diff there is expected.

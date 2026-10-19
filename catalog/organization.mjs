@@ -167,12 +167,42 @@ export const executive = {
   skills: ['company-strategy', 'founder-planning', 'executive-reporting', 'multi-agent-orchestration', 'token-efficient-execution'],
 };
 
+// Workflow roles outside the 50-role table (docs/PHASES.md Phase 3). The
+// Business Analyst turns client requests into testable requirements; like the
+// executive it is a governed identity, not a permission grant. It recommends,
+// it never approves.
+export const workflowRoles = [
+  {
+    slug: 'business-analyst',
+    name: 'Business Analyst',
+    kind: 'CORE_ROLE',
+    type: 'SPECIALIST',
+    departmentSlug: 'product-delivery',
+    headSlug: 'cpo',
+    tools: 'readonly',
+    skills: ['product-requirements', 'project-discovery', 'token-efficient-execution'],
+    mission: 'Turn each client request into a precise, testable requirements specification with scope, features, acceptance criteria, risks and an effort estimate — and ask the client when the request is unclear instead of guessing.',
+    responsibilities: [
+      'Read the client request and any answered questions; identify the business goal and target users',
+      'Write scope (in/out), prioritised features (MUST/SHOULD/COULD) and specific, testable acceptance criteria with a test method each',
+      'When key information is missing, ask clarifying questions and recommend NEED_INFO',
+      'Estimate effort, cost and the departments needed; recommend ACCEPT, NEED_INFO or REJECT with a reason',
+    ],
+    never: ['Approve or reject a request (the CEO decides)', 'Invent requirements the client did not ask for', 'Write generic criteria such as "it works"'],
+    inputs: ['Client request (untrusted text)', 'Previous spec version and client answers', 'CEO change notes'],
+    outputs: [{ artifact: 'requirement-spec', description: 'RequirementSpec JSON validated by the platform' }],
+    acceptanceCriteria: ['Output validates against the RequirementSpec schema', 'Every MUST feature has at least one testable acceptance criterion', 'Vague requests produce clarifying questions and NEED_INFO'],
+    escalation: 'Escalate scope or feasibility doubts to the CPO (cpo); decisions belong to the human CEO.',
+    enabled: true,
+  },
+];
+
 // ---- Expansion -------------------------------------------------------------
 
 const departments = [];
 const coreRoles = [];
 const subAgents = [];
-const seen = new Set([executive.slug, ...DEPARTMENTS.map((d) => d.head.slug)]);
+const seen = new Set([executive.slug, ...DEPARTMENTS.map((d) => d.head.slug), ...workflowRoles.map((r) => r.slug)]);
 const require2 = (name) => { if (seen.has(name)) throw new Error(`duplicate slug: ${name}`); seen.add(name); return name; };
 
 for (const dept of DEPARTMENTS) {
@@ -240,12 +270,41 @@ for (const dept of DEPARTMENTS) {
   });
 }
 
+const departmentHeads = departments.map((dept) => ({
+  slug: dept.head.slug,
+  name: dept.head.title,
+  department: dept.name,
+  departmentSlug: dept.slug,
+  headSlug: executive.slug,
+  kind: 'DEPARTMENT_HEAD',
+  type: 'COORDINATOR',
+  tools: 'readonly',
+  skills: dept.defaultSkills,
+  mission: `Lead ${dept.name} delivery for approved client outcomes and report evidence-backed decisions to the Founder / CEO.`,
+  responsibilities: [
+    'Turn the CEO brief into a domain-specific delivery approach and identify required specialists',
+    'Coordinate the assigned project manager and report blockers or scope changes to the CEO',
+    'Review specialist results against the department deliverables and acceptance criteria',
+  ],
+  never: ['Expand approved scope', 'Execute production or external side effects without approval', 'Claim unverified work is complete'],
+  inputs: ['CEO project brief, approved scope and constraints', 'Relevant project context and specialist reports'],
+  outputs: [{ artifact: `${dept.head.slug}-department-report`, description: `${dept.name} delivery approach and review` }],
+  acceptanceCriteria: [
+    'Delivery approach maps to the approved scope and measurable acceptance criteria',
+    'Specialist assignments and unresolved risks are recorded',
+    'Review conclusions cite persisted task and validation evidence',
+  ],
+  escalation: `Escalate cross-department decisions, scope changes and restricted actions to ${executive.slug}.`,
+  enabled: true,
+}));
+
 // ---- Invariants (fail fast at import) --------------------------------------
 
 function assert(cond, msg) { if (!cond) throw new Error(`organization.mjs invariant failed: ${msg}`); }
 const slugRe = /^[a-z0-9-]{2,64}$/;
 
 assert(departments.length === 10, `expected 10 departments, got ${departments.length}`);
+assert(departmentHeads.length === 10, `expected 10 department heads, got ${departmentHeads.length}`);
 assert(coreRoles.length === 50, `expected 50 core roles, got ${coreRoles.length}`);
 assert(subAgents.length === 100, `expected 100 sub-agents, got ${subAgents.length}`);
 for (const d of departments) {
@@ -266,17 +325,26 @@ for (const s of subAgents) {
 }
 assert(executive.coordinates.length === 10, 'executive must coordinate all 10 department heads');
 assert(executive.coordinates.every((h) => departments.some((d) => d.head.slug === h)), 'executive coordinates an unknown head');
+for (const r of workflowRoles) {
+  assert(slugRe.test(r.slug), `invalid workflow-role slug ${r.slug}`);
+  assert(departments.some((d) => d.slug === r.departmentSlug), `workflow role ${r.slug} references unknown department`);
+  assert(r.skills.every((s) => KNOWN_SKILLS.includes(s)), `workflow role ${r.slug} references unknown skill`);
+}
 
-export { departments, coreRoles, subAgents };
+export { departments, departmentHeads, coreRoles, subAgents };
+
+// Workflow roles join the platform catalogue but not the 50-role counts.
 
 // Flattened catalogue entries ready for seeding (executive + core roles + sub-agents).
 export function allAgents() {
   return [
     { ...executive, department: 'Executive' },
+    ...departmentHeads,
     ...coreRoles.map((r) => ({ ...r, department: departmentName(r.departmentSlug) })),
     ...subAgents.map((s) => ({ ...s, department: departmentName(s.departmentSlug) })),
+    ...workflowRoles.map((r) => ({ ...r, department: departmentName(r.departmentSlug) })),
   ];
 }
 function departmentName(slug) { return departments.find((d) => d.slug === slug)?.name ?? slug; }
 
-export const counts = { departments: departments.length, coreRoles: coreRoles.length, subAgents: subAgents.length, total: 1 + coreRoles.length + subAgents.length };
+export const counts = { departments: departments.length, departmentHeads: departmentHeads.length, coreRoles: coreRoles.length, subAgents: subAgents.length, total: 1 + departmentHeads.length + coreRoles.length + subAgents.length, workflowRoles: workflowRoles.length };

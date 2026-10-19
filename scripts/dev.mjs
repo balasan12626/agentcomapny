@@ -68,20 +68,34 @@ if (env.ADMIN_EMAIL && env.ADMIN_PASSWORD) {
 }
 
 step('Starting API, worker and web');
-const procs = [
-  ['api', ['run', 'dev', '-w', 'server']],
-  ['worker', ['run', 'worker', '-w', 'server']],
-  ['web', ['run', 'dev', '-w', 'web']],
-].map(([name, args]) => {
+let stopping = false;
+const procs = new Map(); // name -> current child process
+// The worker has no --watch; if it dies, queued work silently stops. Restart
+// it (bounded backoff) — the dashboard also shows it OFFLINE via heartbeat.
+const RESTART = { worker: true };
+function start(name, args, attempt = 0) {
   const p = spawn(npm, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: win });
   const tag = (d) => String(d).split('\n').filter(Boolean).forEach((l) => console.log(`[${name}] ${l}`));
   p.stdout.on('data', tag);
   p.stderr.on('data', tag);
-  p.on('exit', (code) => console.log(`[${name}] exited (${code})`));
+  const startedAt = Date.now();
+  p.on('exit', (code) => {
+    console.log(`[${name}] exited (${code})`);
+    if (stopping || !RESTART[name]) return;
+    const next = Date.now() - startedAt > 60_000 ? 0 : attempt + 1;
+    if (next > 5) { console.log(`[${name}] crashed ${next} times in a row — not restarting. Fix the error above, then run: npm run worker -w server`); return; }
+    const delay = Math.min(30_000, 1000 * 2 ** next);
+    console.log(`[${name}] restarting in ${delay / 1000}s`);
+    setTimeout(() => { if (!stopping) start(name, args, next); }, delay);
+  });
+  procs.set(name, p);
   return p;
-});
+}
+start('api', ['run', 'dev', '-w', 'server']);
+start('worker', ['run', 'worker', '-w', 'server']);
+start('web', ['run', 'dev', '-w', 'web']);
 const lan = Object.values(os.networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
 console.log(`\n  Open http://localhost:3000${lan ? `   ·   phone on same Wi-Fi: http://${lan}:3000` : ''}\n`);
-const stop = () => { procs.forEach((p) => p.kill('SIGTERM')); process.exit(0); };
+const stop = () => { stopping = true; for (const p of procs.values()) p.kill('SIGTERM'); process.exit(0); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { connectDb } from '../src/config/db.js';
 import { Agent, AgentVersion, Department } from '../src/models/index.js';
 import { payloadHash } from '../src/core/canonical.js';
-import { departments, coreRoles, subAgents, allAgents } from '../../catalog/organization.mjs';
+import { departments, departmentHeads, coreRoles, subAgents, workflowRoles, allAgents } from '../../catalog/organization.mjs';
 
 const TOOLSETS = { readonly: ['Read', 'Grep', 'Glob'], review: ['Read', 'Grep', 'Glob', 'Bash'], build: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash'] };
 
@@ -37,7 +37,11 @@ for (const a of allAgents()) {
   if (agent.$isNew || agent.wasNew) created += 1;
 
   const body = {
-    instructions: a.mission,
+    instructions: [
+      a.mission,
+      ...(a.responsibilities?.length ? [`Responsibilities:\n${a.responsibilities.map((item) => `- ${item}`).join('\n')}`] : []),
+      ...(a.never?.length ? [`Never:\n${a.never.map((item) => `- ${item}`).join('\n')}`] : []),
+    ].join('\n\n'),
     watches: a.inputs || [],
     produces: (a.outputs || []).map((o) => (typeof o === 'string' ? o : o.artifact)),
     skills: (a.skills || []).map((slug) => ({ slug })),
@@ -52,6 +56,6 @@ for (const a of allAgents()) {
   bumped += 1;
 }
 
-const total = 1 + coreRoles.length + subAgents.length;
-console.log(`organization seeded: ${d} departments, ${total} agents (${coreRoles.length} core roles, ${subAgents.length} sub-agents, 1 executive); versions written/bumped: ${bumped}`);
+const total = 1 + departmentHeads.length + coreRoles.length + subAgents.length;
+console.log(`organization seeded: ${d} departments, ${total} agents (${departmentHeads.length} department heads, ${coreRoles.length} core roles, ${subAgents.length} sub-agents, 1 executive) + ${workflowRoles.length} workflow role(s) (${workflowRoles.map((r) => r.slug).join(', ')}); versions written/bumped: ${bumped}`);
 await mongoose.disconnect();

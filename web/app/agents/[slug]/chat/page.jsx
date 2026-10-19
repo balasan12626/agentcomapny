@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { useTaskEvents } from '@/lib/useTaskEvents';
 import { Data } from '@/components/States';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Markdown } from '@/components/Markdown';
+import { QueueAnywayPrompt } from '@/components/Preflight';
 
 // Chat with ONE specialist. Every message is a real single-agent run through
 // the governed pipeline (tenant scope + workspace path guard + usage). The
@@ -20,7 +22,7 @@ export default function AgentChat({ params }) {
   const { orgId } = agents;
   const agent = (agents.data || []).find((a) => a.slug === slug);
   const [projectId, setProjectId] = useState('');
-  const pid = projectId || projects.data?.[0]?._id || '';
+  const pid = projectId || projects.data?.find((p) => p.workspace?.configured)?._id || projects.data?.[0]?._id || '';
   const conversationId = pid ? `chat-${slug}-${pid}` : '';
   const [thread, setThread] = useState([]);
   const [input, setInput] = useState('');
@@ -28,6 +30,7 @@ export default function AgentChat({ params }) {
   const [resumeSessionId, setResumeSessionId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [refused, setRefused] = useState(null);
   const { events, connected } = useTaskEvents(orgId, activeTaskId);
   const endRef = useRef(null);
 
@@ -52,17 +55,21 @@ export default function AgentChat({ params }) {
     // eslint-disable-next-line
   }, [last]);
 
-  async function send(e) {
-    e.preventDefault();
-    const msg = input.trim();
+  async function send(e, { text, queueAnyway = false } = {}) {
+    e?.preventDefault();
+    const msg = (text ?? input).trim();
     if (!msg || !pid || busy) return;
-    setBusy(true); setError(null); setInput('');
-    setThread((t) => [...t, { _id: `pending-${Date.now()}`, message: msg, status: 'QUEUED', reply: null }]);
+    setBusy(true); setError(null); setRefused(null); setInput('');
+    const pendingId = `pending-${Date.now()}`;
+    setThread((t) => [...t, { _id: pendingId, message: msg, status: 'QUEUED', reply: null }]);
     try {
-      const res = await api(`/orgs/${orgId}/agents/${slug}/chat`, { method: 'POST', body: { message: msg, projectId: pid, conversationId, resumeSessionId: resumeSessionId || undefined } });
+      const res = await api(`/orgs/${orgId}/agents/${slug}/chat`, { method: 'POST', body: { message: msg, projectId: pid, conversationId, resumeSessionId: resumeSessionId || undefined, ...(queueAnyway ? { queueAnyway: true } : {}) } });
       setActiveTaskId(res.task._id);
     } catch (err) {
-      setError(err.body?.error || err.message); setBusy(false);
+      // Nothing was queued: drop the optimistic bubble and give the text back.
+      setThread((t) => t.filter((m) => m._id !== pendingId)); setInput(msg);
+      if (err.body?.code === 'WORKER_OFFLINE') setRefused({ err, msg }); else setError(err.body?.error || err.message);
+      setBusy(false);
     }
   }
 
@@ -93,8 +100,8 @@ export default function AgentChat({ params }) {
           <>
             <div className="card" style={{ marginBottom: 12 }}>
               <label>Project (workspace the agent works in)
-                <select value={projectId || list[0]?._id} onChange={(e) => setProjectId(e.target.value)}>
-                  {list.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                <select value={pid} onChange={(e) => setProjectId(e.target.value)}>
+                  {list.map((p) => <option key={p._id} value={p._id}>{p.clientName ? `${p.clientName} · ` : ''}{p.name}{p.workspace?.configured ? '' : ' — no workspace'}</option>)}
                 </select>
               </label>
             </div>
@@ -107,7 +114,7 @@ export default function AgentChat({ params }) {
                   <div style={{ marginTop: 6 }}>
                     <strong style={{ fontSize: 12 }}>{agent?.name || slug}</strong> <StatusBadge status={m.status} />
                     {m.reply
-                      ? <div className="bubble agent" style={{ whiteSpace: 'pre-wrap' }}>{m.reply}</div>
+                      ? <div className="bubble agent"><Markdown text={m.reply} /></div>
                       : m.error
                         ? <div className="s-err">{m.error}</div>
                         : <div className="sub">{m._id.startsWith('pending') && liveLine ? liveLine : '…'}</div>}
@@ -119,6 +126,7 @@ export default function AgentChat({ params }) {
             </div>
 
             {error && <p role="alert" className="s-err">{error}</p>}
+            <QueueAnywayPrompt error={refused?.err} onConfirm={() => send(null, { text: refused.msg, queueAnyway: true })} onDismiss={() => setRefused(null)} />
             <form className="row" onSubmit={send} style={{ marginTop: 10, gap: 8 }}>
               <input style={{ flex: 1 }} value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Message ${agent?.name || slug}…`} disabled={busy} />
               <button className="btn" disabled={busy || !input.trim()}>{busy ? 'Working…' : 'Send'}</button>

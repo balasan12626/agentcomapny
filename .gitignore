@@ -11,3 +11,5 @@ graphify-out/*.tmp
 .datylune/
 artifacts-store/
 tools/agent-platform-evaluation/
+.data-backups/
+.next-build/
