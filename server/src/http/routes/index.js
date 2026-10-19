@@ -150,6 +150,7 @@ export function apiRouter({ enqueue }) {
       organizationId: req.organizationId, projectId: req.valid.projectId, createdBy: req.user._id,
       idempotencyKey: req.valid.idempotencyKey, instruction: req.valid.request, mode: req.valid.mode,
       agents: taskShape.agents, acceptanceCriteria: taskShape.acceptanceCriteria, budget,
+      plan: taskShape.plan,
     });
     if (created) await enqueue({ organizationId: req.organizationId, taskId: task._id });
     await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'ceo.execute', target: String(task._id), requestId: req.id });

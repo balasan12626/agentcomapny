@@ -51,7 +51,20 @@ export async function executeTask({ organizationId, taskId, signal, runner = run
   const cwd = createPathGuard({ allowedRoots: project.workspace.allowedRoots, deniedPatterns: project.workspace.deniedPatterns?.length ? project.workspace.deniedPatterns : undefined })(project.workspace.allowedRoots[0]);
 
   const resolved = await resolveAgents(task);
-  const plan = buildPlan(resolved.map(({ agent, version }) => ({ slug: agent.slug, watches: version.watches, produces: version.produces })), LIMITS);
+  // Prefer a plan the caller already persisted (the CEO router computes
+  // dependency-ordered stages from the request). Only derive one from the
+  // agents' MetaGPT-style watches/produces when no plan was supplied — the
+  // catalogue roles declare prose watches, which the artifact graph can't
+  // satisfy, so re-deriving there would wrongly fail planning.
+  const plan = task.plan?.stages?.length
+    // Deep-plain the persisted plan: task.plan is a Mongoose subdocument whose
+    // arrays/subdocs carry circular parent refs, which overflow the stack when
+    // serialized into events. Map to plain arrays/objects before reuse.
+    ? {
+      stages: task.plan.stages.map((s) => [...s]),
+      edges: (task.plan.edges || []).map((e) => ({ from: e.from, to: e.to, artifact: e.artifact })),
+    }
+    : buildPlan(resolved.map(({ agent, version }) => ({ slug: agent.slug, watches: version.watches, produces: version.produces })), LIMITS);
   await Task.updateOne({ _id: taskId, organizationId }, { $set: { plan } });
   await appendEvent({ organizationId, taskId, kind: 'plan', data: plan });
   task = await transitionTask({ organizationId, taskId, to: 'RUNNING' });
@@ -89,7 +102,13 @@ export async function executeTask({ organizationId, taskId, signal, runner = run
   }
 
   task = await transitionTask({ organizationId, taskId, to: 'VALIDATING' });
-  await setCriterion({ organizationId, taskId, criterionId: 'AC-1', status: allOk ? 'PASSED' : 'FAILED', evidence: results.map((r) => `${r.slug}:${r.ok ? 'ok' : 'failed'}`).join(', ') });
+  // Mark the task's actual acceptance criteria by their real ids (CEO plans
+  // emit ac-1/ac-2/..., defaults differ) — a hardcoded id silently matched
+  // nothing and threw, stranding the task in VALIDATING.
+  const evidence = results.map((r) => `${r.slug}:${r.ok ? 'ok' : 'failed'}`).join(', ');
+  for (const c of task.acceptanceCriteria || []) {
+    await setCriterion({ organizationId, taskId, criterionId: c.id, status: allOk ? 'PASSED' : 'FAILED', evidence });
+  }
   if (!allOk) return transitionTask({ organizationId, taskId, to: 'FAILED', error: 'one or more agent runs failed' });
 
   task = await Task.findById(taskId);
