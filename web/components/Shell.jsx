@@ -1,13 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building2, Users, FolderKanban, Bot, Wrench, Library, ListChecks, ShieldCheck, Terminal, Laptop, Plug, Activity, ScrollText, Settings, Bug, Crown, Network } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, FolderKanban, Bot, Wrench, Library, ListChecks, ShieldCheck, Terminal, Laptop, Plug, Activity, ScrollText, Settings, Bug, Crown, Network, MessageSquare } from 'lucide-react';
 import { OrgProvider, useOrg } from '@/lib/org';
 import { Login } from './Login';
 import { Loading, ErrorState } from './States';
 
 const NAV = [
-  ['Executive', [['/dashboard', 'Overview', LayoutDashboard], ['/executive', 'Founder & CEO', Crown]]],
+  ['Executive', [['/dashboard', 'Overview', LayoutDashboard], ['/ceo', 'CEO Orchestrator', MessageSquare], ['/executive', 'Founder & CEO', Crown]]],
   ['Work', [['/tasks', 'Tasks', ListChecks], ['/approvals', 'Approvals', ShieldCheck], ['/sessions', 'Claude Sessions', Terminal]]],
   ['Agents', [['/catalog', 'Company Org', Network], ['/agents', 'Agent Catalog', Bot], ['/agents/builder', 'Agent Builder', Wrench], ['/skills', 'Skills Library', Library]]],
   ['Security', [['/security', 'Defensive Security', Bug]]],
