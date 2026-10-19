@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useOrgApi } from '@/lib/useApi';
 import { Data } from '@/components/States';
 
@@ -12,14 +13,17 @@ function RoleCard({ role }) {
         <span className="sub" style={{ whiteSpace: 'nowrap' }}>{role.type}</span>
       </div>
       <div className="sub">{role.slug} · v{role.publishedVersion || '—'} · {role.enabled ? 'enabled' : 'disabled'}</div>
-      <button onClick={() => setOpen((v) => !v)} style={{ alignSelf: 'flex-start', fontSize: 12 }}>
-        {open ? '▾' : '▸'} {role.subAgentCount} specialist sub-agents
-      </button>
+      <div className="row" style={{ gap: 8 }}>
+        <button onClick={() => setOpen((v) => !v)} style={{ fontSize: 12 }}>
+          {open ? '▾' : '▸'} {role.subAgentCount} sub-agents
+        </button>
+        <Link href={`/agents/${role.slug}/chat`} className="btn secondary" style={{ fontSize: 12, padding: '4px 10px' }}>💬 Chat</Link>
+      </div>
       {open && (
         <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
           {role.subAgents.map((s) => (
             <li key={s._id} style={{ marginBottom: 2 }}>
-              <span>{s.name}</span> <span className="sub">· {s.slug}</span>
+              <Link href={`/agents/${s.slug}/chat`}>{s.name}</Link> <span className="sub">· {s.slug}</span>
             </li>
           ))}
         </ul>

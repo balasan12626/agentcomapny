@@ -149,6 +149,12 @@ const taskSchema = new Schema({
   attempts: { type: Number, default: 0 },
   lastEventSeq: { type: Number, default: 0 },
   error: String,
+  // Per-agent chat: `kind:'chat'` tasks are a single specialist answering in a
+  // thread; conversationId groups the thread and resumeSessionId continues the
+  // agent's own Claude session so the chat keeps context across messages.
+  kind: { type: String, enum: ['task', 'chat'], default: 'task' },
+  conversationId: { type: String, index: true },
+  resumeSessionId: String,
 }, opts);
 taskSchema.index({ organizationId: 1, idempotencyKey: 1 }, { unique: true });
 taskSchema.index({ organizationId: 1, projectId: 1, status: 1, createdAt: -1 });

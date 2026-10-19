@@ -59,6 +59,47 @@ export function apiRouter({ enqueue }) {
     res.json(await AgentVersion.find({ agentId: agent._id }).sort({ version: -1 }).lean());
   });
 
+  // Per-agent chat: talk to ONE specialist directly. Each message is a real
+  // single-agent run through the same governed pipeline (tenant scope, workspace
+  // path guard, usage recording) — the agent answers only within its specialty,
+  // enforced by its own system prompt + scoped tools. conversationId groups the
+  // thread; the agent's Claude session is resumed so follow-ups keep context.
+  r.get(`${o}/agents/:slug/chat`, requireOrg(P.read), async (req, res) => {
+    const conversationId = String(req.query.conversationId || '');
+    if (!conversationId) return res.json([]);
+    const tasks = await Task.find({ organizationId: req.organizationId, conversationId, kind: 'chat' }).sort({ createdAt: 1 }).limit(100).lean();
+    const runs = await AgentRun.find({ organizationId: req.organizationId, taskId: { $in: tasks.map((t) => t._id) } }).lean();
+    const runByTask = new Map(runs.map((r) => [String(r.taskId), r]));
+    res.json(tasks.map((t) => {
+      const run = runByTask.get(String(t._id));
+      return { _id: t._id, status: t.status, message: t.instruction, createdAt: t.createdAt, reply: run?.summary || null, error: t.error || run?.error || null, sessionId: run?.claudeSessionId || null };
+    }));
+  });
+  r.post(`${o}/agents/:slug/chat`, requireOrg(P.execute), validate(z.object({
+    message: z.string().min(1).max(20000),
+    projectId: objectId,
+    conversationId: z.string().min(4).max(160).optional(),
+    resumeSessionId: z.string().max(128).optional(),
+  })), async (req, res) => {
+    const agent = await Agent.findOne({ slug: req.params.slug, enabled: true, $or: [{ organizationId: req.organizationId }, { organizationId: null }] }).lean();
+    if (!agent) return res.status(404).json({ error: 'agent not available' });
+    const project = await Project.findOne({ _id: req.valid.projectId, organizationId: req.organizationId });
+    if (!project) return res.status(404).json({ error: 'project not found' });
+    const conversationId = req.valid.conversationId || `chat-${agent.slug}-${req.valid.projectId}`;
+    const org = await Organization.findById(req.organizationId).lean();
+    const budget = { maxTokens: org?.budgets?.maxTokensPerTask, maxCostUsd: org?.budgets?.maxCostUsdPerTask };
+    const { task, created } = await createTask({
+      organizationId: req.organizationId, projectId: req.valid.projectId, createdBy: req.user._id,
+      idempotencyKey: `chat-${conversationId}-${Date.now()}`, instruction: req.valid.message, mode: 'QUICK',
+      agents: [{ slug: agent.slug }], plan: { stages: [[agent.slug]], edges: [] },
+      acceptanceCriteria: [{ id: 'ac-1', description: `${agent.name} responds within its specialty with supporting evidence` }],
+      kind: 'chat', conversationId, resumeSessionId: req.valid.resumeSessionId, budget,
+    });
+    if (created) await enqueue({ organizationId: req.organizationId, taskId: task._id });
+    await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'agent.chat', target: `${agent.slug}:${String(task._id)}`, requestId: req.id });
+    res.status(created ? 201 : 200).json({ task, conversationId });
+  });
+
   // Company hierarchy: Founder/CEO -> 10 departments (+heads) -> 50 core roles -> 100 sub-agents.
   r.get(`${o}/catalog`, requireOrg(P.read), async (req, res) => {
     const scope = { $or: [{ organizationId: req.organizationId }, { organizationId: null }] };

@@ -84,6 +84,23 @@ panel ideas (tokens/cron/webhooks) as future native panels. If a running externa
 ever wanted, encapsulate it behind a read-only adapter (agent registry / execution / events /
 approvals) that maps into DATYLUNE's canonical Task+Agent model — never duplicate its DB.
 
+## Mission Control — install + launch attempt (2026-10-19)
+
+Chosen as the one permissively-licensed, relevant candidate and **installed + launched**:
+- `corepack pnpm install` succeeded, but pnpm's security default **ignored native build
+  scripts** (`better-sqlite3`, `esbuild`, `sharp`, …). `pnpm rebuild better-sqlite3 esbuild`
+  exited 0 but produced **no native binary** (no Node 24 prebuild; no C++ toolchain to compile).
+- Launched `next dev` on **http://127.0.0.1:3007** (free port; DATYLUNE's 3000/4000 untouched).
+  **Server boots (Next.js 16, ready in 10.6s); `/login` renders; `/` → 307 → `/login`.**
+- `require('better-sqlite3')` **fails to load** ("Could not locate the bindings file"), so every
+  DB-backed route is unusable. `/api/agents` returns 401 (auth gate, before DB) — not proof of DB.
+
+**Verdict: PARTIALLY_VERIFIED (server + login UI on :3007) / BLOCKED (SQLite native module won't
+load on Node 24 without an MSVC build toolchain).** Not installing a system toolchain unprompted
+(per the evaluation's own safety rule). This reinforces the recommendation: **do not adopt;
+build natively.** Credentials for the local instance are in the git-ignored
+`MissionControl/.datylune-eval-credentials.txt` (admin + a strong random password), never committed.
+
 ## Not done / staged (honest)
 
 - **No external app was installed or launched** this session (pnpm/Next build, Python venv,

@@ -10,7 +10,7 @@ const DEFAULT_CRITERIA = {
 
 // Idempotent: the same (organizationId, idempotencyKey) returns the existing
 // task instead of creating a duplicate, even under concurrent submission.
-export async function createTask({ organizationId, projectId, createdBy, idempotencyKey, instruction, mode = 'STANDARD', agents = [], acceptanceCriteria, budget, plan }) {
+export async function createTask({ organizationId, projectId, createdBy, idempotencyKey, instruction, mode = 'STANDARD', agents = [], acceptanceCriteria, budget, plan, kind, conversationId, resumeSessionId }) {
   const existing = await Task.findOne({ organizationId, idempotencyKey });
   if (existing) return { task: existing, created: false };
   const criteria = acceptanceCriteria?.length ? acceptanceCriteria : DEFAULT_CRITERIA[mode] || DEFAULT_CRITERIA.STANDARD;
@@ -18,7 +18,7 @@ export async function createTask({ organizationId, projectId, createdBy, idempot
     // A caller-supplied plan (e.g. the CEO router's dependency-ordered stages)
     // is persisted up front so the orchestrator runs it as-is instead of
     // re-deriving one from agent watches/produces.
-    const task = await Task.create({ organizationId, projectId, createdBy, idempotencyKey, instruction, mode, agents, acceptanceCriteria: criteria, budget, usage: {}, ...(plan?.stages?.length ? { plan } : {}) });
+    const task = await Task.create({ organizationId, projectId, createdBy, idempotencyKey, instruction, mode, agents, acceptanceCriteria: criteria, budget, usage: {}, ...(plan?.stages?.length ? { plan } : {}), ...(kind ? { kind } : {}), ...(conversationId ? { conversationId } : {}), ...(resumeSessionId ? { resumeSessionId } : {}) });
     await appendEvent({ organizationId, taskId: task._id, kind: 'state', data: { status: 'QUEUED' } });
     return { task, created: true };
   } catch (err) {

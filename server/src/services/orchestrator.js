@@ -89,6 +89,9 @@ export async function executeTask({ organizationId, taskId, signal, runner = run
         permissionMode: 'default',
         maxTurns: version.limits?.maxTurns,
         maxBudgetUsd: version.limits?.maxCostUsd || task.budget?.maxCostUsd,
+        // Continue the agent's own Claude session for per-agent chat threads so
+        // follow-up messages keep context. Only meaningful for single-agent chat.
+        resumeSessionId: task.kind === 'chat' ? task.resumeSessionId : undefined,
       }, { cwd, signal, timeoutMs: version.limits?.timeoutMs || MODE_TIMEOUT_MS[task.mode] });
       handle.events.on('event', (ev) => { appendEvent({ organizationId, taskId, agentRunId: run._id, kind: `agent_${ev.kind}`, data: ev }).catch(() => {}); });
       const res = await handle.done;
