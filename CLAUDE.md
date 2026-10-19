@@ -1,7 +1,7 @@
 # DATYLUNE AI OS — Claude Code operating manual
 
 Product: **DATYLUNE AI OS** by DATYLUNE SOLUTIONS — secure, governed, multi-tenant, multi-agent company operations.
-This file is loaded every session: keep it short, true and in sync with the code. Details live in `docs/`.
+This file is loaded every session: keep it short, true and in sync with the code. Details live in `docs/`; human guides: `README.md` (run it) and `CLAUDE_README.md` (agents, skills, prompts).
 
 ## Stack (do not change without explicit approval)
 - Web: Next.js 15 App Router, React 19, JavaScript/JSX, React Flow (`web/`)
@@ -57,6 +57,7 @@ This file is loaded every session: keep it short, true and in sync with the code
 ## Commands
 ```
 npm install                     # workspaces: server, connector, web
+npm run setup:env && npm run doctor && npm run dev   # run locally (API :4000, worker, web :3000)
 npm test                        # unit tests (server + connector)
 npm run test:integration        # needs redis-server; MongoDB via MONGODB_TEST_URI
 npm run lint                    # syntax gate

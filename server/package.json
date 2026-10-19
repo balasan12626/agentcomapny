@@ -5,13 +5,14 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
-    "worker": "node src/queue/worker.js",
+    "dev": "node --env-file-if-exists=../.env --watch src/index.js",
+    "start": "node --env-file-if-exists=../.env src/index.js",
+    "worker": "node --env-file-if-exists=../.env src/queue/worker.js",
     "test": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.js\"",
     "lint": "node scripts/check-syntax.js",
-    "seed": "node scripts/seed-catalog.js"
+    "seed": "node --env-file-if-exists=../.env scripts/seed-catalog.js",
+    "create-admin": "node --env-file-if-exists=../.env scripts/create-admin.js"
   },
   "dependencies": {
     "bullmq": "^5.34.0",

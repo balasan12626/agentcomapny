@@ -17,7 +17,10 @@
     "dev:worker": "npm run worker -w server",
     "dev:web": "npm run dev -w web",
     "validate:claude": "node scripts/validate-claude-config.mjs",
-    "generate:agents": "node scripts/generate-claude-agents.mjs"
+    "generate:agents": "node scripts/generate-claude-agents.mjs",
+    "dev": "node scripts/dev.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "setup:env": "node scripts/setup-env.mjs"
   },
   "engines": {
     "node": ">=20"
