@@ -5,7 +5,7 @@ import { authenticate, requireOrg, validate, SESSION_COOKIE } from '../middlewar
 import { PERMISSIONS as P } from '../../core/permissions.js';
 import { signToken, verifyPassword } from '../../core/session.js';
 import { validateSkillMarkdown, reviewSkillBundle } from '../../core/skillValidator.js';
-import { User, Membership, Organization, Project, Agent, AgentVersion, Department, Skill, SkillVersion, Task, AgentRun, Approval, AuditLog, UsageRecord, BugBountyScope, SecurityFinding } from '../../models/index.js';
+import { User, Membership, Organization, Project, Client, Agent, AgentVersion, Department, Skill, SkillVersion, Task, AgentRun, Approval, AuditLog, UsageRecord, BugBountyScope, SecurityFinding } from '../../models/index.js';
 import { createTask, transitionTask } from '../../services/tasks.js';
 import { eventsSince } from '../../services/events.js';
 import { decide } from '../../services/approvals.js';
@@ -43,10 +43,27 @@ export function apiRouter({ enqueue }) {
     if (req.membership.projectIds?.length) filter._id = { $in: req.membership.projectIds };
     res.json(await Project.find(filter).sort({ name: 1 }).lean());
   });
-  r.post(`${o}/projects`, requireOrg(P.manageProjects), validate(z.object({ name: z.string().min(2).max(120), allowedRoots: z.array(z.string().min(1)).max(10).default([]) })), async (req, res) => {
-    const p = await Project.create({ organizationId: req.organizationId, name: req.valid.name, workspace: { allowedRoots: req.valid.allowedRoots } });
+  r.post(`${o}/projects`, requireOrg(P.manageProjects), validate(z.object({ name: z.string().min(2).max(120), allowedRoots: z.array(z.string().min(1)).max(10).default([]), clientId: objectId.optional() })), async (req, res) => {
+    if (req.valid.clientId && !(await Client.findOne({ _id: req.valid.clientId, organizationId: req.organizationId }))) return res.status(404).json({ error: 'client not found' });
+    const p = await Project.create({ organizationId: req.organizationId, name: req.valid.name, clientId: req.valid.clientId, workspace: { allowedRoots: req.valid.allowedRoots } });
     await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'project.create', target: String(p._id), requestId: req.id });
     res.status(201).json(p);
+  });
+
+  // Clients: a client owns one or more projects; the CEO/Project Manager then
+  // plans and dispatches work per project (see /ceo/execute). This is the
+  // client -> project -> PM/CEO -> team chain of a real delivery org.
+  r.get(`${o}/clients`, requireOrg(P.read), async (req, res) => {
+    const clients = await Client.find({ organizationId: req.organizationId }).sort({ name: 1 }).lean();
+    const projects = await Project.find({ organizationId: req.organizationId }).sort({ name: 1 }).lean();
+    const byClient = new Map();
+    for (const p of projects) { const k = String(p.clientId || ''); (byClient.get(k) || byClient.set(k, []).get(k)).push(p); }
+    res.json(clients.map((c) => ({ ...c, projects: byClient.get(String(c._id)) || [] })));
+  });
+  r.post(`${o}/clients`, requireOrg(P.manageProjects), validate(z.object({ name: z.string().min(2).max(120) })), async (req, res) => {
+    const c = await Client.create({ organizationId: req.organizationId, name: req.valid.name });
+    await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'client.create', target: String(c._id), requestId: req.id });
+    res.status(201).json(c);
   });
 
   r.get(`${o}/agents`, requireOrg(P.read), async (req, res) => {

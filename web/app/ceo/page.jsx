@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useOrgApi } from '@/lib/useApi';
 import { api } from '@/lib/api';
 import { Data } from '@/components/States';
@@ -63,8 +63,9 @@ export default function Ceo() {
   const projects = useOrgApi('/projects');
   const { orgId } = projects;
   const router = useRouter();
+  const search = useSearchParams();
   const [request, setRequest] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(search.get('projectId') || '');
   const [mode, setMode] = useState('STANDARD');
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
