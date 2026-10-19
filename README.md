@@ -19,36 +19,35 @@ Claude Code is the AI execution engine, MongoDB stores everything, Redis + BullM
 
 No Docker? Install **MongoDB 7 (as a replica set)** and **Redis 7** yourself and point `MONGODB_URI` / `REDIS_URL` at them in `.env`.
 
-## 2. Quick start (5 commands)
+## 2. Get the code
 
+First time:
 ```bash
 git clone https://github.com/balasan12626/agentcomapny.git
 cd agentcomapny
-git checkout claude/peaceful-wright-9nolwq   # until merged to main
-
-npm install                 # installs server, connector and web
-npm run setup:env           # creates .env with a random SESSION_SECRET and your Wi-Fi IP
-docker compose up -d        # starts MongoDB (replica set) + Redis
-npm run doctor              # every line should show ✔
+git checkout claude/peaceful-wright-9nolwq
 ```
 
-Then create the agent catalog and your first admin login (once):
-
+Get the latest changes later:
 ```bash
-npm run seed -w server
-ADMIN_PASSWORD='choose-a-strong-password' npm run create-admin -w server -- datylune "DATYLUNE SOLUTIONS" you@example.com
+cd agentcomapny
+git pull origin claude/peaceful-wright-9nolwq
+npm install
 ```
-Windows PowerShell: `$env:ADMIN_PASSWORD='choose-a-strong-password'; npm run create-admin -w server -- datylune "DATYLUNE SOLUTIONS" you@example.com`
 
-Start everything (API :4000, worker, web :3000):
+## 3. Run everything with one command
 
 ```bash
 npm run dev
 ```
 
-Open **http://localhost:3000** and sign in with the email and password you just created.
+On the first run this creates `.env`, starts MongoDB + Redis in Docker (Docker Desktop must be open), seeds the agent catalog, then starts the **backend API (:4000), the worker and the frontend (:3000)** together. Ctrl+C stops them.
 
-## 3. Open it on your phone
+**First login:** open `.env`, fill in `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters), then run `npm run dev` again — the admin account is created automatically. Open **http://localhost:3000** and sign in.
+
+If something fails, run `npm run doctor`; it lists exactly what is missing and how to fix it.
+
+## 4. Open it on your phone
 
 1. Phone and computer must be on the **same Wi-Fi**.
 2. `npm run dev` prints a line like `phone on same Wi-Fi: http://192.168.1.23:3000` — open that address on the phone.
@@ -59,7 +58,7 @@ Open **http://localhost:3000** and sign in with the email and password you just 
 
 **Away from your Wi-Fi?** Use a tunnel you trust (for example Cloudflare Tunnel or ngrok) pointing at port 3000 and add its hostname to `WEB_ORIGIN` / `DEV_ORIGINS`. This makes your login page public on the internet — use a strong password, and stop the tunnel when you're done. Live updates also need port 4000 (WebSocket) reachable; set `NEXT_PUBLIC_WS_URL` to its public `wss://…/ws` address.
 
-## 4. First steps in the app
+## 5. First steps in the app
 
 1. **Projects** → create a project and enter the folder agents may work in (e.g. `C:\work\client-app`).
 2. **Tasks** → pick the project, one or more agents, a mode, write the instruction, submit.
@@ -67,11 +66,11 @@ Open **http://localhost:3000** and sign in with the email and password you just 
 4. **Approvals** → a different person with approval rights accepts or rejects results and risky actions.
 5. **Monitoring** → token consumption per task; **Audit** → who did what.
 
-## 5. Commands
+## 6. Commands
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start API + worker + web together (Ctrl+C stops all) |
+| `npm run dev` | **One command:** env file, MongoDB + Redis (Docker), catalog, admin, then API + worker + web |
 | `npm run doctor` | Check Node, `.env`, MongoDB, Redis, Claude Code |
 | `npm run setup:env` | Create `.env` (add `-- --force` to regenerate) |
 | `npm run dev:api` / `dev:worker` / `dev:web` | Start one part only |
@@ -82,7 +81,7 @@ Open **http://localhost:3000** and sign in with the email and password you just 
 | `npm run validate:claude` | Validate `CLAUDE.md`, skills and agents |
 | `npm run generate:agents` | Rebuild `.claude/agents/*.md` from `catalog/agents.json` |
 
-## 6. Configuration (`.env`)
+## 7. Configuration (`.env`)
 
 | Variable | Meaning |
 |---|---|
@@ -97,11 +96,11 @@ Open **http://localhost:3000** and sign in with the email and password you just 
 
 `.env` is git-ignored. Never commit it.
 
-## 7. Production (outline)
+## 8. Production (outline)
 
 `npm run build`, then run `npm run start -w server`, `npm run worker -w server` and `npm run start -w web` behind HTTPS (reverse proxy), with `NODE_ENV=production` (secure cookies), a managed MongoDB replica set with backups, and Redis with persistence. See [docs/SETUP.md](docs/SETUP.md) and the open items in the checklist (phase G) before going live.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -109,11 +108,11 @@ Open **http://localhost:3000** and sign in with the email and password you just 
 | `✖ Cannot reach MongoDB` | `docker compose up -d`, wait ~20 s, `npm run doctor` |
 | `SESSION_SECRET (>=32 chars) is required` | `npm run setup:env -- --force` |
 | Login says invalid credentials | `create-admin` never changes an existing user's password — check the password you first used, or create the admin with a new email (password reset is not built yet) |
-| Phone can't connect | See section 3 |
+| Phone can't connect | See section 4 |
 | Tasks stay QUEUED | Worker not running or Redis down → check `[worker]` lines in `npm run dev` |
 | Tasks fail immediately | `claude --version` works? Is Claude Code logged in? Does the project folder exist on this computer? |
 
-## 9. Repository layout
+## 10. Repository layout
 
 ```
 server/      API, worker, models, core security logic (JavaScript)

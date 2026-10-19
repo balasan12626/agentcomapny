@@ -57,7 +57,8 @@ This file is loaded every session: keep it short, true and in sync with the code
 ## Commands
 ```
 npm install                     # workspaces: server, connector, web
-npm run setup:env && npm run doctor && npm run dev   # run locally (API :4000, worker, web :3000)
+npm run dev                     # one command: env, Mongo+Redis (Docker), seed, API :4000 + worker + web :3000
+npm run doctor                  # diagnose local setup
 npm test                        # unit tests (server + connector)
 npm run test:integration        # needs redis-server; MongoDB via MONGODB_TEST_URI
 npm run lint                    # syntax gate

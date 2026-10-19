@@ -7,6 +7,9 @@ Checks run: `npm test` → server 19/19, connector 3/3 · `npm run test:integrat
 ## Session 2 (2026-10-19)
 Added README.md (full start + phone access) and CLAUDE_README.md; scripts `setup:env`, `doctor`, `dev` (starts API + worker + web, web on 0.0.0.0); `.env` loaded via `--env-file-if-exists`; `allowedDevOrigins` from `DEV_ORIGINS`; friendly MongoDB-unreachable exit. Cloud container cannot run the API (no MongoDB) or expose a URL (tunnel hosts blocked).
 
+## Session 3 (2026-10-19)
+`npm run dev` now does full local startup (env, Docker Mongo+Redis, seed, admin, all 3 processes). README has clone/pull commands. Happy path not verified here (no Docker/MongoDB). Note: orchestration is our own JS planner + React Flow UI, not LangGraph.
+
 ## Blockers
 - Graphify: package install denied in the cloud session → D-01/D-02 BLOCKED. Install locally per docs/GRAPHIFY_INTEGRATION.md.
 - MongoDB: no binary/daemon reachable → DB-backed integration tests skipped. Run with `MONGODB_TEST_URI=mongodb://localhost:27017/dltest?replicaSet=rs0`.
