@@ -1,0 +1,37 @@
+{
+  "name": "@datylune/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "worker": "node src/queue/worker.js",
+    "test": "node --test \"test/unit/**/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.js\"",
+    "lint": "node scripts/check-syntax.js",
+    "seed": "node scripts/seed-catalog.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.34.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.2",
+    "mongoose": "^8.9.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1",
+    "cookie": "^1.0.2"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.3",
+    "supertest": "^7.0.0"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./core/*": "./src/core/*.js",
+    "./adapters/*": "./src/adapters/*.js"
+  }
+}

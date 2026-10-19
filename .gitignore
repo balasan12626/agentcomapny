@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+graphify-out/cache/
+graphify-out/*.tmp
+.datylune/
+artifacts-store/

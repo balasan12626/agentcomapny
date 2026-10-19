@@ -1,0 +1,9 @@
+{
+  "$comment": "Initial DB-only catalog records (no .claude file until a team needs one). Default toolset: readonly. Integrations (Ads, GA4, CRM...) require separately authorized, scoped credentials; none is configured.",
+  "Marketing and Growth": ["SEO Specialist", "Generative Engine Optimization Specialist", "Google Ads Analyst", "Meta Ads Analyst", "GA4 Analyst", "Google Tag Manager Specialist", "Content Marketing Specialist", "Copywriter", "Social Media Specialist", "Email Marketing Specialist", "Conversion Optimization Specialist", "Competitor Research Analyst", "Marketing Analytics Specialist"],
+  "Data and AI": ["Data Analyst", "SQL Analyst", "Power BI Specialist", "Tableau Specialist", "Data Engineering Specialist", "Machine Learning Specialist", "RAG and Knowledge Retrieval Specialist", "AI Evaluation Specialist", "Forecasting Analyst", "Data Quality Specialist"],
+  "Sales and Customer Operations": ["Lead Research Specialist", "Lead Qualification Specialist", "Proposal Writer", "Sales Operations Specialist", "CRM Analyst", "Customer Support Triage Agent", "Knowledge Base Specialist", "Customer Success Analyst", "Feedback Analysis Specialist"],
+  "Business Operations": ["Executive Assistant", "Project Coordinator", "Finance Analyst", "Budget Analyst", "Procurement Researcher", "Operations Analyst", "Compliance Research Assistant", "HR Operations Assistant"],
+  "Defensive Security": ["Security Architect", "Application Security Engineer", "Dependency and Supply-Chain Analyst", "Vulnerability Triage Analyst", "Threat Modelling Specialist", "Cloud Security Reviewer", "Secrets and Configuration Auditor", "Security Test Engineer", "Incident Response Assistant", "Security Documentation and Compliance Assistant"],
+  "Software Engineering": ["UI/UX Engineer", "API Integration Engineer", "Debugging Specialist", "DevOps Engineer", "Cloud Infrastructure Specialist", "Documentation Specialist"]
+}

@@ -1,0 +1,12 @@
+# Never index secrets, customer data, deps or build output.
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/node_modules/
+web/.next/
+graphify-out/
+artifacts-store/
+.datylune/
+**/package-lock.json

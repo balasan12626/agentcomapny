@@ -1,0 +1,46 @@
+/* DATYLUNE design tokens — obsidian surfaces, restrained violet/electric-blue. */
+:root {
+  --bg: #0b0b10; --surface: #13131b; --surface-2: #1a1a25; --border: #262636;
+  --text: #ececf3; --muted: #9a9ab0; --accent: #8b5cf6; --accent-2: #3b82f6;
+  --ok: #22c55e; --warn: #f59e0b; --err: #ef4444; --info: #38bdf8;
+  --radius: 10px; --space: 16px; --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.layout { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.sidebar { border-right: 1px solid var(--border); padding: var(--space); background: linear-gradient(180deg, #111119, var(--bg)); position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.brand { font-weight: 700; letter-spacing: .08em; margin-bottom: 20px; }
+.brand span { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.nav a { display: flex; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; }
+.nav a:hover, .nav a[aria-current="page"] { background: var(--surface-2); color: var(--text); }
+.nav h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 16px 10px 6px; font-weight: 600; }
+main { padding: 24px 28px; min-width: 0; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.grid { display: grid; gap: var(--space); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space); }
+.card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.stat { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid currentColor; }
+.s-ok { color: var(--ok); } .s-warn { color: var(--warn); } .s-err { color: var(--err); } .s-info { color: var(--info); } .s-muted { color: var(--muted); } .s-accent { color: var(--accent); }
+.btn { background: var(--accent); color: white; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; cursor: pointer; }
+.btn.secondary { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+input, select, textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; width: 100%; }
+label { display: grid; gap: 4px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+.state { padding: 32px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.split { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space); }
+.timeline { max-height: 520px; overflow: auto; font-family: ui-monospace, monospace; font-size: 12px; }
+.timeline div { padding: 4px 0; border-bottom: 1px solid var(--border); }
+.graph { height: 460px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.skeleton { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: sh 1.2s infinite; }
+@keyframes sh { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .split { grid-template-columns: 1fr; } main { padding: 16px; } }

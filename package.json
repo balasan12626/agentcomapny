@@ -1,0 +1,25 @@
+{
+  "name": "datylune-ai-os",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DATYLUNE AI OS \u2014 governed multi-agent company operations platform",
+  "workspaces": [
+    "server",
+    "connector",
+    "web"
+  ],
+  "scripts": {
+    "test": "npm test -w server && npm test -w connector",
+    "test:integration": "npm run test:integration -w server",
+    "lint": "npm run lint -w server",
+    "build": "npm run build -w web",
+    "dev:api": "npm run dev -w server",
+    "dev:worker": "npm run worker -w server",
+    "dev:web": "npm run dev -w web",
+    "validate:claude": "node scripts/validate-claude-config.mjs",
+    "generate:agents": "node scripts/generate-claude-agents.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
