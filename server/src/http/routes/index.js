@@ -5,12 +5,13 @@ import { authenticate, requireOrg, validate, SESSION_COOKIE } from '../middlewar
 import { PERMISSIONS as P } from '../../core/permissions.js';
 import { signToken, verifyPassword } from '../../core/session.js';
 import { validateSkillMarkdown, reviewSkillBundle } from '../../core/skillValidator.js';
-import { User, Membership, Organization, Project, Agent, AgentVersion, Skill, SkillVersion, Task, AgentRun, Approval, AuditLog, UsageRecord, BugBountyScope, SecurityFinding } from '../../models/index.js';
+import { User, Membership, Organization, Project, Agent, AgentVersion, Department, Skill, SkillVersion, Task, AgentRun, Approval, AuditLog, UsageRecord, BugBountyScope, SecurityFinding } from '../../models/index.js';
 import { createTask, transitionTask } from '../../services/tasks.js';
 import { eventsSince } from '../../services/events.js';
 import { decide } from '../../services/approvals.js';
 import { audit } from '../../services/audit.js';
 import { validateScope, canAdvanceFinding } from '../../core/bugBountyScope.js';
+import { planFromRequest, planToTask } from '../../core/ceoRouter.js';
 
 const objectId = z.string().refine((v) => mongoose.isValidObjectId(v), 'invalid id');
 const page = (req) => ({ limit: Math.min(Number(req.query.limit) || 50, 200), skip: Math.max(Number(req.query.skip) || 0, 0) });
@@ -56,6 +57,103 @@ export function apiRouter({ enqueue }) {
     const agent = await Agent.findOne({ slug: req.params.slug, $or: [{ organizationId: req.organizationId }, { organizationId: null }] }).lean();
     if (!agent) return res.status(404).json({ error: 'agent not found' });
     res.json(await AgentVersion.find({ agentId: agent._id }).sort({ version: -1 }).lean());
+  });
+
+  // Company hierarchy: Founder/CEO -> 10 departments (+heads) -> 50 core roles -> 100 sub-agents.
+  r.get(`${o}/catalog`, requireOrg(P.read), async (req, res) => {
+    const scope = { $or: [{ organizationId: req.organizationId }, { organizationId: null }] };
+    const [depts, agents] = await Promise.all([
+      Department.find(scope).sort({ order: 1, name: 1 }).lean(),
+      Agent.find({ ...scope, kind: { $in: ['EXECUTIVE', 'CORE_ROLE', 'SUBAGENT'] } }).sort({ name: 1 }).lean(),
+    ]);
+    const bySlug = new Map(agents.map((a) => [a.slug, a]));
+    const subsByParent = new Map();
+    for (const a of agents) if (a.kind === 'SUBAGENT' && a.parentSlug) {
+      (subsByParent.get(a.parentSlug) || subsByParent.set(a.parentSlug, []).get(a.parentSlug)).push(a);
+    }
+    const executive = agents.find((a) => a.kind === 'EXECUTIVE') || null;
+    const departments = depts.map((d) => {
+      const coreRoles = agents
+        .filter((a) => a.kind === 'CORE_ROLE' && a.departmentSlug === d.slug)
+        .map((r) => ({ ...r, subAgents: (subsByParent.get(r.slug) || []), subAgentCount: (subsByParent.get(r.slug) || []).length }));
+      return { ...d, headAgent: d.head?.slug ? (bySlug.get(d.head.slug) || null) : null, coreRoles, coreRoleCount: coreRoles.length };
+    });
+    res.json({
+      executive,
+      departments,
+      counts: {
+        departments: departments.length,
+        coreRoles: agents.filter((a) => a.kind === 'CORE_ROLE').length,
+        subAgents: agents.filter((a) => a.kind === 'SUBAGENT').length,
+      },
+    });
+  });
+
+  // Dynamic CEO routing: preview the minimal team a request needs (no execution).
+  r.post(`${o}/ceo/plan`, requireOrg(P.read), validate(z.object({ request: z.string().min(2).max(20000) })), async (req, res) => {
+    const scope = { $or: [{ organizationId: req.organizationId }, { organizationId: null }] };
+    const [depts, agents] = await Promise.all([
+      Department.find(scope).sort({ order: 1 }).lean(),
+      Agent.find({ ...scope, kind: { $in: ['EXECUTIVE', 'CORE_ROLE', 'SUBAGENT'] } }).lean(),
+    ]);
+    const subsByParent = new Map();
+    for (const a of agents) if (a.kind === 'SUBAGENT' && a.parentSlug) (subsByParent.get(a.parentSlug) || subsByParent.set(a.parentSlug, []).get(a.parentSlug)).push({ slug: a.slug, name: a.name });
+    const catalog = {
+      executive: agents.find((a) => a.kind === 'EXECUTIVE') || { slug: 'founder-ceo' },
+      departments: depts.map((d) => ({
+        slug: d.slug, name: d.name, head: d.head,
+        coreRoles: agents.filter((a) => a.kind === 'CORE_ROLE' && a.departmentSlug === d.slug)
+          .map((rr) => ({ slug: rr.slug, name: rr.name, departmentSlug: d.slug, type: rr.type, subAgents: subsByParent.get(rr.slug) || [] })),
+      })),
+    };
+    res.json({ request: req.valid.request, plan: planFromRequest(req.valid.request, catalog) });
+  });
+
+  // CEO turns a request into a persisted, dependency-ordered Task. dryRun (the
+  // default) returns the plan + would-be Task WITHOUT persisting or executing.
+  // execute:true persists a real Task and dispatches it through the durable
+  // queue to the Claude Code runtime (requires the execute permission).
+  r.post(`${o}/ceo/execute`, requireOrg(P.execute), validate(z.object({
+    request: z.string().min(2).max(20000),
+    projectId: objectId,
+    idempotencyKey: z.string().min(8).max(128),
+    mode: z.enum(['QUICK', 'STANDARD', 'DEEP', 'PARALLEL', 'SCHEDULED']).default('STANDARD'),
+    execute: z.boolean().default(false),
+  })), async (req, res) => {
+    const project = await Project.findOne({ _id: req.valid.projectId, organizationId: req.organizationId });
+    if (!project) return res.status(404).json({ error: 'project not found' });
+    const scope = { $or: [{ organizationId: req.organizationId }, { organizationId: null }] };
+    const [depts, agents] = await Promise.all([
+      Department.find(scope).sort({ order: 1 }).lean(),
+      Agent.find({ ...scope, kind: { $in: ['EXECUTIVE', 'CORE_ROLE', 'SUBAGENT'] } }).lean(),
+    ]);
+    const subsByParent = new Map();
+    for (const a of agents) if (a.kind === 'SUBAGENT' && a.parentSlug) (subsByParent.get(a.parentSlug) || subsByParent.set(a.parentSlug, []).get(a.parentSlug)).push({ slug: a.slug, name: a.name });
+    const catalog = {
+      executive: agents.find((a) => a.kind === 'EXECUTIVE') || { slug: 'founder-ceo' },
+      departments: depts.map((d) => ({
+        slug: d.slug, name: d.name, head: d.head,
+        coreRoles: agents.filter((a) => a.kind === 'CORE_ROLE' && a.departmentSlug === d.slug)
+          .map((rr) => ({ slug: rr.slug, name: rr.name, departmentSlug: d.slug, type: rr.type, subAgents: subsByParent.get(rr.slug) || [] })),
+      })),
+    };
+    const plan = planFromRequest(req.valid.request, catalog);
+    const taskShape = planToTask(plan);
+    if (plan.coreRoles.length === 0) return res.status(422).json({ error: 'no capability matched; ask the user to clarify', plan });
+
+    if (!req.valid.execute) {
+      return res.json({ dryRun: true, plan, task: { instruction: req.valid.request, mode: req.valid.mode, ...taskShape } });
+    }
+    const org = await Organization.findById(req.organizationId).lean();
+    const budget = { maxTokens: org?.budgets?.maxTokensPerTask, maxCostUsd: org?.budgets?.maxCostUsdPerTask };
+    const { task, created } = await createTask({
+      organizationId: req.organizationId, projectId: req.valid.projectId, createdBy: req.user._id,
+      idempotencyKey: req.valid.idempotencyKey, instruction: req.valid.request, mode: req.valid.mode,
+      agents: taskShape.agents, acceptanceCriteria: taskShape.acceptanceCriteria, budget,
+    });
+    if (created) await enqueue({ organizationId: req.organizationId, taskId: task._id });
+    await audit({ organizationId: req.organizationId, actor: { kind: 'user', id: String(req.user._id) }, action: 'ceo.execute', target: String(task._id), requestId: req.id });
+    res.status(created ? 201 : 200).json({ dryRun: false, created, plan, task });
   });
 
   r.get(`${o}/skills`, requireOrg(P.read), async (req, res) => {

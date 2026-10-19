@@ -57,6 +57,17 @@ export const RegisteredDevice = model('RegisteredDevice', new Schema({
   lastHeartbeatAt: Date,
 }, opts));
 
+// Company org chart: departments (platform catalogue when organizationId=null).
+const departmentSchema = new Schema({
+  organizationId: { type: Id, ref: 'Organization', default: null, index: true },
+  slug: { type: String, required: true, match: /^[a-z0-9-]{2,64}$/ },
+  name: { type: String, required: true },
+  head: { slug: String, title: String },
+  order: { type: Number, default: 0 },
+}, opts);
+departmentSchema.index({ organizationId: 1, slug: 1 }, { unique: true });
+export const Department = model('Department', departmentSchema);
+
 const agentSchema = new Schema({
   organizationId: { type: Id, ref: 'Organization', default: null, index: true }, // null = platform catalog
   slug: { type: String, required: true, match: /^[a-z0-9-]{2,64}$/ },
@@ -65,6 +76,13 @@ const agentSchema = new Schema({
   type: { type: String, enum: ['SPECIALIST', 'COORDINATOR', 'REVIEWER', 'BACKGROUND_WORKER', 'EXECUTIVE'], default: 'SPECIALIST' },
   enabled: { type: Boolean, default: true },
   publishedVersion: Number,
+  // Company hierarchy (optional; set for the organization.mjs catalogue).
+  kind: { type: String, enum: ['EXECUTIVE', 'CORE_ROLE', 'SUBAGENT', null], default: null, index: true },
+  departmentSlug: { type: String, default: null, index: true },
+  headSlug: { type: String, default: null },       // department head this role reports to
+  parentSlug: { type: String, default: null, index: true }, // sub-agent -> its core role
+  subAgentSlugs: { type: [String], default: undefined }, // core role -> its two sub-agents
+  coordinates: { type: [String], default: undefined },   // executive -> department head slugs
 }, opts);
 agentSchema.index({ organizationId: 1, slug: 1 }, { unique: true });
 export const Agent = model('Agent', agentSchema);

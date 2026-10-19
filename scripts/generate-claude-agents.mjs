@@ -2,8 +2,9 @@
 // `--check` fails if committed files drift from the catalog.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const catalog = JSON.parse(fs.readFileSync(path.join(root, 'catalog/agents.json'), 'utf8'));
 const skillsDir = path.join(root, '.claude/skills');
 const outDir = path.join(root, '.claude/agents');

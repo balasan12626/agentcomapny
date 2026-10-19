@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { Worker } from 'bullmq';
 import { redis, QUEUE_NAME } from './connection.js';
 import { connectDb } from '../config/db.js';
@@ -43,7 +44,7 @@ export async function recoverQueued() {
   return stuck.length;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await connectDb();
   logger.info({ recovered: await recoverQueued() }, 'recovery sweep');
   const worker = createWorker();

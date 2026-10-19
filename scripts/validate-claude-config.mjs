@@ -3,10 +3,11 @@
 // and verifies CLAUDE.md documents the real stack.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { validateSkillMarkdown } from '../server/src/core/skillValidator.js';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
 const skillsDir = path.join(root, '.claude/skills');
 let count = 0;

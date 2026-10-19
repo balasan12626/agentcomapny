@@ -12,6 +12,7 @@
     "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.js\"",
     "lint": "node scripts/check-syntax.js",
     "seed": "node --env-file-if-exists=../.env scripts/seed-catalog.js",
+    "seed:org": "node --env-file-if-exists=../.env scripts/seed-organization.js",
     "create-admin": "node --env-file-if-exists=../.env scripts/create-admin.js"
   },
   "dependencies": {

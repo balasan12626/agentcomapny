@@ -3,12 +3,13 @@
 // definition hash changes. No tenant data or metrics are seeded.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import { connectDb } from '../src/config/db.js';
 import { Agent, AgentVersion } from '../src/models/index.js';
 import { payloadHash } from '../src/core/canonical.js';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const catalog = JSON.parse(fs.readFileSync(path.join(root, 'catalog/agents.json'), 'utf8'));
 const departments = JSON.parse(fs.readFileSync(path.join(root, 'catalog/departments.json'), 'utf8'));
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);

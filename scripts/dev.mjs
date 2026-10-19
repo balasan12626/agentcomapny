@@ -58,10 +58,11 @@ console.log('  ✔ MongoDB and Redis are up');
 
 step('Seeding agent catalog (safe to repeat)');
 if (!run(npm, ['run', 'seed', '-w', 'server'])) process.exit(1);
+if (!run(npm, ['run', 'seed:org', '-w', 'server'])) process.exit(1);
 
 if (env.ADMIN_EMAIL && env.ADMIN_PASSWORD) {
   step(`Ensuring admin login ${env.ADMIN_EMAIL}`);
-  run(npm, ['run', 'create-admin', '-w', 'server', '--', env.ORG_SLUG || 'datylune', env.ORG_NAME || 'DATYLUNE SOLUTIONS', env.ADMIN_EMAIL]);
+  run(npm, ['run', 'create-admin', '-w', 'server', '--', env.ORG_SLUG || 'datylune', `"${env.ORG_NAME || 'DATYLUNE SOLUTIONS'}"`, env.ADMIN_EMAIL]);
 } else {
   console.log('\n  (No ADMIN_EMAIL / ADMIN_PASSWORD in .env — set them to create your first login automatically.)');
 }
